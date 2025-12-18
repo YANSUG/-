@@ -3,99 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夜市彈珠台 V8 (混沌物理版)</title>
+    <title>夜市彈珠台 V9 (擬真慢速版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
-            --bg-dark: #121218;
-            --panel-bg: #1e1e24;
+            --bg-dark: #0f0f13;
             --neon-blue: #00f2ff;
             --neon-pink: #ff0055;
-            --neon-gold: #ffcc00;
-            --text-main: #ffffff;
-            --text-sub: #888888;
+            --wood-dark: #1a150e;
         }
 
         body {
             background-color: var(--bg-dark);
-            color: var(--text-main);
+            color: white;
             font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
+            margin: 0; padding: 15px; min-height: 100vh;
         }
 
         /* 頂部導航 */
         .top-bar {
-            width: 100%; max-width: 480px;
+            width: 100%; max-width: 450px;
             display: flex; justify-content: flex-end; gap: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         .nav-btn {
             background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
             color: white; padding: 5px 12px; border-radius: 15px; cursor: pointer;
-            font-size: 0.85em; transition: 0.2s;
+            font-size: 0.8em; transition: 0.2s;
         }
-        .nav-btn:hover { background: rgba(255,255,255,0.2); }
 
         h1 {
             color: var(--neon-pink);
             text-shadow: 0 0 10px var(--neon-pink);
-            margin: 0 0 15px 0;
-            font-style: italic; letter-spacing: 2px;
+            margin: 0 0 10px 0; font-style: italic; letter-spacing: 1px;
         }
 
-        /* 機台外框 */
         .machine {
-            position: relative;
-            background: #2a2a35;
-            padding: 15px;
-            border-radius: 20px;
-            border: 4px solid #444;
-            box-shadow: 0 0 40px rgba(0,0,0,0.6);
+            background: #2a2a35; padding: 15px; border-radius: 20px;
+            border: 4px solid #444; box-shadow: 0 0 40px rgba(0,0,0,0.6);
             max-width: 450px; width: 100%;
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* 資訊儀表板 */
         .dashboard {
-            width: 100%;
-            display: flex; justify-content: space-between;
-            background: #111; padding: 10px; border-radius: 10px;
-            margin-bottom: 15px; box-sizing: border-box;
-            border: 1px solid #333;
+            width: 100%; display: flex; justify-content: space-between;
+            background: #111; padding: 8px 15px; border-radius: 10px;
+            margin-bottom: 10px; box-sizing: border-box; border: 1px solid #333;
         }
-        .dash-item { display: flex; flex-direction: column; }
-        .dash-label { font-size: 0.75em; color: var(--text-sub); }
         .dash-val { font-size: 1.1em; font-weight: bold; color: var(--neon-blue); font-family: monospace; }
-        #poolAmount { color: var(--neon-gold); }
 
-        /* 遊戲畫布 */
+        /* 遊戲畫布 - 更加高，讓球滾更久 */
         canvas {
-            background: #1a150e; /* 深木色背景 */
-            border-radius: 12px;
-            border: 2px solid #5c3a1b;
-            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
-            margin-bottom: 15px;
-            cursor: pointer;
+            background: var(--wood-dark);
+            border-radius: 12px; border: 2px solid #5c3a1b;
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.9);
+            margin-bottom: 15px; cursor: pointer;
         }
 
-        /* 控制區 */
-        .controls { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+        .controls { width: 100%; display: flex; flex-direction: column; gap: 8px; }
 
         .btn {
-            padding: 14px; border: none; border-radius: 10px;
+            padding: 12px; border: none; border-radius: 10px;
             font-weight: bold; font-size: 1rem; cursor: pointer;
-            text-transform: uppercase; transition: 0.2s; position: relative; overflow: hidden;
+            text-transform: uppercase; transition: 0.2s;
         }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
         .btn:active { transform: scale(0.98); }
 
         .btn-connect { background: #3b82f6; color: white; }
-        .btn-random { background: linear-gradient(135deg, #e11d48, #be123c); color: white; box-shadow: 0 4px 10px rgba(225, 29, 72, 0.3); }
+        .btn-random { background: linear-gradient(135deg, #e11d48, #be123c); color: white; }
         .btn-play { background: linear-gradient(135deg, #00f260, #0575e6); color: white; box-shadow: 0 4px 10px rgba(5, 117, 230, 0.3); }
 
         .input-wrapper {
@@ -108,10 +85,7 @@
         }
         .bet-input:focus { outline: none; }
 
-        .wallet-info {
-            font-size: 0.85em; color: var(--text-sub); margin-top: 5px;
-            display: flex; justify-content: space-between; width: 100%;
-        }
+        .wallet-info { font-size: 0.8em; color: #888; margin-top: 5px; display: flex; justify-content: space-between; width: 100%; }
 
         /* 彈窗 */
         .modal-overlay {
@@ -120,56 +94,49 @@
             display: none; justify-content: center; align-items: center; z-index: 1000;
         }
         .modal-content {
-            background: var(--panel-bg); padding: 30px; border-radius: 15px;
-            text-align: center; border: 1px solid #444; width: 85%; max-width: 350px;
+            background: #1e1e24; padding: 30px; border-radius: 15px;
+            text-align: center; border: 1px solid #444; width: 80%; max-width: 300px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: popIn 0.3s;
         }
         @keyframes popIn { from{transform: scale(0.8); opacity:0;} to{transform: scale(1); opacity:1;} }
-
-        .rule-row { text-align: left; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; font-size: 0.9em; line-height: 1.4; }
-        .rule-title { color: var(--neon-gold); font-weight: bold; margin-bottom: 4px; }
+        
+        .rule-row { text-align: left; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 0.9em; }
     </style>
 </head>
 <body>
 
 <div class="top-bar">
-    <button class="nav-btn" onclick="openRules()"><span data-i18n="rules">規則說明</span></button>
+    <button class="nav-btn" onclick="openRules()"><span data-i18n="rules">規則</span></button>
     <button class="nav-btn" onclick="toggleLang()">EN / 中文</button>
 </div>
 
-<h1><span data-i18n="title">夜市彈珠台</span> <span style="font-size:0.5em; color:#555;">V8</span></h1>
+<h1><span data-i18n="title">夜市彈珠台</span> <span style="font-size:0.5em; color:#555;">V9</span></h1>
 
 <div class="machine">
     <div class="dashboard">
-        <div class="dash-item">
-            <span class="dash-label" data-i18n="multiplier">當前倍率</span>
-            <span class="dash-val" id="disp-multi" style="color:var(--neon-pink)">--</span>
-        </div>
-        <div class="dash-item" style="text-align:right;">
-            <span class="dash-label" data-i18n="pool">總獎池</span>
-            <span class="dash-val" id="poolAmount">--</span>
-        </div>
+        <div><span style="font-size:0.8em; color:#888;" data-i18n="multiplier">倍率</span> <span class="dash-val" id="disp-multi" style="color:var(--neon-pink)">--</span></div>
+        <div><span style="font-size:0.8em; color:#888;" data-i18n="pool">獎池</span> <span class="dash-val" id="poolAmount" style="color:#ffcc00">--</span></div>
     </div>
 
-    <canvas id="gameCanvas" width="400" height="580"></canvas>
+    <canvas id="gameCanvas" width="400" height="620"></canvas>
 
     <div class="controls">
         <button class="btn btn-connect" id="connectBtn" onclick="connectWallet()"><span data-i18n="connect">連接錢包</span></button>
         
-        <div id="gameUI" style="display:none; width:100%; flex-direction:column; gap:10px;">
+        <div id="gameUI" style="display:none; width:100%; flex-direction:column; gap:8px;">
             <div class="wallet-info">
                 <span id="walletAddr">--</span>
-                <span><span data-i18n="balance">餘額</span>: <span id="userBalance" style="color:var(--neon-blue)">--</span> CRO</span>
+                <span><span data-i18n="balance">餘額</span>: <span id="userBalance" style="color:#00f2ff">--</span> CRO</span>
             </div>
 
-            <button class="btn btn-random" id="randomBtn" onclick="randomizeConfig()"><span data-i18n="random_btn">🎰 投幣選台 (隨機配置)</span></button>
+            <button class="btn btn-random" id="randomBtn" onclick="randomizeConfig()"><span data-i18n="random_btn">🎰 投幣選台</span></button>
             
             <div class="input-wrapper">
-                <span style="color:#aaa; font-size:0.9em;" data-i18n="bet">下注金額</span>
+                <span style="color:#aaa; font-size:0.9em;" data-i18n="bet">下注</span>
                 <div>
                     <input type="number" id="betAmount" value="1" class="bet-input" oninput="validateBet()">
-                    <span style="color:var(--neon-blue); font-weight:bold;">CRO</span>
+                    <span style="color:#00f2ff; font-weight:bold;">CRO</span>
                 </div>
             </div>
 
@@ -180,17 +147,16 @@
 
 <div class="modal-overlay" id="rulesModal">
     <div class="modal-content">
-        <h2 style="color:var(--neon-gold); margin-top:0;" data-i18n="rules_title">📜 遊戲規則</h2>
-        <div id="rulesContent" style="margin:20px 0; max-height:300px; overflow-y:auto;">
-            </div>
-        <button class="btn" style="background:#333; color:white; width:100%; padding:10px;" onclick="closeModal('rulesModal')"><span data-i18n="close">關閉</span></button>
+        <h3 style="color:#ffcc00; margin-top:0;" data-i18n="rules_title">📜 規則</h3>
+        <div id="rulesContent" style="margin:20px 0; max-height:300px; overflow-y:auto;"></div>
+        <button class="btn" style="background:#333; color:white; padding:8px;" onclick="closeModal('rulesModal')"><span data-i18n="close">關閉</span></button>
     </div>
 </div>
 
 <div class="modal-overlay" id="resultModal">
     <div class="modal-content">
         <h2 id="resTitle">WIN!</h2>
-        <div id="resVal" style="font-size:2.5em; color:#0f0; margin:20px 0; font-weight:800; text-shadow:0 0 15px rgba(0,255,0,0.5);">+10 CRO</div>
+        <div id="resVal" style="font-size:2em; color:#0f0; margin:20px 0;">+10 CRO</div>
         <button class="btn" style="background:#333; color:white; width:100%;" onclick="closeModal('resultModal')"><span data-i18n="confirm">確定</span></button>
     </div>
 </div>
@@ -203,36 +169,33 @@
         "event BallShot(address indexed player, uint256 betAmount, uint256 multiplier, uint256 payout)"
     ];
 
-    // --- 多語言設定 ---
     const i18n = {
         zh: {
-            title: "夜市彈珠台", rules: "規則說明", connect: "連接錢包", multiplier: "當前倍率", pool: "總獎池",
+            title: "夜市彈珠台", rules: "規則", connect: "連接錢包", multiplier: "倍率", pool: "獎池",
             balance: "餘額", random_btn: "🎰 投幣選台 (隨機配置)", bet: "下注", play_btn: "🔴 拉桿發射",
             rules_title: "📜 遊戲規則", close: "關閉", confirm: "確定",
             win: "🎉 中獎啦！", lose: "😢 沒中...", waiting: "確認中...", rolling: "彈珠滾動中...",
             rule_html: `
-                <div class="rule-row"><div class="rule-title">1. 選台</div>點擊「投幣選台」隨機切換倍率 (2X~10X) 與亮燈配置。</div>
-                <div class="rule-row"><div class="rule-title">2. 亮燈機制</div>倍率越高，亮燈數越少 (例如 10倍 只亮 1 燈)。</div>
-                <div class="rule-row"><div class="rule-title">3. 獲勝</div>彈珠落入「亮燈」洞口即獲勝；落入滅燈洞口則失敗。</div>
-                <div class="rule-row"><div class="rule-title">4. 物理</div>模擬真實物理，彈珠軌跡隨機，小心釘子！</div>
+                <div class="rule-row">1. 點擊「投幣選台」隨機切換倍率。</div>
+                <div class="rule-row">2. 倍率越高，亮燈洞口越少。</div>
+                <div class="rule-row">3. 彈珠落入「亮燈」洞口即中獎。</div>
             `
         },
         en: {
-            title: "Pinball", rules: "Rules", connect: "Connect Wallet", multiplier: "Multiplier", pool: "Pool",
-            balance: "Balance", random_btn: "🎰 Random Setup", bet: "Bet", play_btn: "🔴 Launch Ball",
-            rules_title: "📜 Game Rules", close: "Close", confirm: "OK",
+            title: "Pinball", rules: "Rules", connect: "Connect", multiplier: "Multi", pool: "Pool",
+            balance: "Bal", random_btn: "🎰 Random Setup", bet: "Bet", play_btn: "🔴 Launch",
+            rules_title: "📜 Rules", close: "Close", confirm: "OK",
             win: "🎉 YOU WIN!", lose: "😢 MISSED...", waiting: "Confirming...", rolling: "Rolling...",
             rule_html: `
-                <div class="rule-row"><div class="rule-title">1. Setup</div>Click 'Random Setup' to get a multiplier (2X~10X) and lit slots.</div>
-                <div class="rule-row"><div class="rule-title">2. Lights</div>Higher multiplier = fewer lit slots (e.g., 10X has 1 light).</div>
-                <div class="rule-row"><div class="rule-title">3. Win</div>Land in a LIT slot to win. Unlit slots lose.</div>
-                <div class="rule-row"><div class="rule-title">4. Physics</div>Real physics simulation. Watch out for the pins!</div>
+                <div class="rule-row">1. Click 'Random Setup' to start.</div>
+                <div class="rule-row">2. Higher multiplier = fewer lights.</div>
+                <div class="rule-row">3. Land in a LIT slot to win.</div>
             `
         }
     };
     let curLang = 'zh';
 
-    // --- 遊戲變數 ---
+    // 遊戲設定
     const CONFIGS = [
         { multi: 2, lights: 4 },
         { multi: 4, lights: 3 },
@@ -242,46 +205,48 @@
     ];
     const NUM_SLOTS = 10;
     
-    // --- 物理引擎變數 (V8 混沌版) ---
+    // --- V9 物理引擎變數 (擬真慢速) ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
 
-    const GRAVITY = 0.18;       // 重力
-    const BOUNCE = 0.5;         // 彈力
-    const FRICTION = 0.99;      // 空氣阻力
+    // 🔥 極低重力與高阻力，製造「水下/月球」感
+    const GRAVITY = 0.08;       // 重力極小
+    const BOUNCE = 0.55;        // 彈力適中
+    const FRICTION = 0.992;     // 空氣阻力小，保持動量
     const PIN_RADIUS = 3;
-    const BALL_RADIUS = 7;
+    const BALL_RADIUS = 6;
 
     let ball = { x: 0, y: 0, vx: 0, vy: 0, active: false };
     let pins = [];
     let slots = [];
     let activeSlotIndices = [];
     let targetSlotIndex = -1;
-    let pinHitIndex = -1; // 用於視覺回饋
+    let pinHitIndex = -1; 
 
-    // 初始化物理場景 (交錯排列 + 隨機擾動)
+    // 初始化物理場景 (更密集的釘子陣列)
     function initPhysics() {
         pins = [];
-        const rows = 11; 
-        const startY = 90;
-        const spacingY = 40;
+        // 增加到 14 排，讓球必須經過更多碰撞
+        const rows = 14; 
+        const startY = 80;
+        const spacingY = 32; // 更密集的垂直間距
 
         for (let r = 0; r < rows; r++) {
-            // 交錯排列：偶數行少一個釘子，且整體向右偏移
+            // 讓釘子數量更多 (9 或 10)，增加碰撞機會
             const isEven = r % 2 === 0;
-            const cols = isEven ? 8 : 9;
-            const rowWidth = (cols - 1) * 40;
+            const cols = isEven ? 9 : 10;
+            const rowWidth = (cols - 1) * 38;
             const offsetX = (width - rowWidth) / 2;
 
             for (let c = 0; c < cols; c++) {
-                // 加入隨機擾動 (Jitter)，讓釘子歪歪的
-                const jitterX = (Math.random() - 0.5) * 6; 
-                const jitterY = (Math.random() - 0.5) * 6;
+                // 隨機擾動，讓釘子不是完美排列
+                const jitterX = (Math.random() - 0.5) * 8; 
+                const jitterY = (Math.random() - 0.5) * 8;
                 
                 pins.push({
-                    x: offsetX + c * 40 + jitterX,
+                    x: offsetX + c * 38 + jitterX,
                     y: startY + r * spacingY + jitterY
                 });
             }
@@ -299,9 +264,7 @@
         }
     }
 
-    // 繪圖循環
     function draw() {
-        // 清除背景
         ctx.fillStyle = '#1a150e';
         ctx.fillRect(0, 0, width, height);
 
@@ -309,84 +272,60 @@
         pins.forEach((p, i) => {
             ctx.beginPath();
             ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
-            // 撞到時發亮
             if (i === pinHitIndex) {
-                ctx.fillStyle = '#fff';
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = '#fff';
+                ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#fff';
             } else {
-                ctx.fillStyle = '#888';
-                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#999'; ctx.shadowBlur = 0;
             }
             ctx.fill();
         });
         ctx.shadowBlur = 0;
-        if(pinHitIndex !== -1) pinHitIndex = -1; // 重置
+        if(pinHitIndex !== -1) pinHitIndex = -1;
 
         // 2. 畫洞口
         for(let i=0; i<NUM_SLOTS; i++) {
             const s = slots[i];
             const isLit = activeSlotIndices.includes(i);
             
-            // 洞口本體
             ctx.fillStyle = '#111';
             ctx.fillRect(s.x+1, height-40, s.w-2, 40);
             
-            // 燈號
             if(isLit) {
-                ctx.fillStyle = '#00f2ff';
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#00f2ff';
-                ctx.beginPath();
-                ctx.arc(s.cx, height-25, 5, 0, Math.PI*2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#00f2ff'; ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
+                ctx.beginPath(); ctx.arc(s.cx, height-25, 5, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
             } else {
                 ctx.fillStyle = '#333';
-                ctx.beginPath();
-                ctx.arc(s.cx, height-25, 3, 0, Math.PI*2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(s.cx, height-25, 3, 0, Math.PI*2); ctx.fill();
             }
-            // 分隔線
-            ctx.strokeStyle = '#444';
-            ctx.beginPath();
-            ctx.moveTo(s.x, height-40);
-            ctx.lineTo(s.x, height);
-            ctx.stroke();
+            ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.moveTo(s.x, height-40); ctx.lineTo(s.x, height); ctx.stroke();
         }
 
         // 3. 畫球
         if (ball.active) {
             updatePhysics();
-            ctx.fillStyle = '#ff0055';
-            ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055';
-            ctx.beginPath();
-            ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI*2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            // 高光
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(ball.x-2, ball.y-2, 2, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ff0055'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055';
+            ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x-2, ball.y-2, 2, 0, Math.PI*2); ctx.fill();
         }
 
         requestAnimationFrame(draw);
     }
 
-    // 🔥 物理核心 (防沾黏 + 微風導航)
+    // 🔥 V9 物理核心：幸運反彈算法 (Lucky Bounce)
     function updatePhysics() {
+        // 1. 物理運動
         ball.vy += GRAVITY;
         ball.vx *= FRICTION;
         ball.vy *= FRICTION;
         
-        // 預判位置
         let nextX = ball.x + ball.vx;
         let nextY = ball.y + ball.vy;
 
-        // 牆壁碰撞
-        if (nextX < BALL_RADIUS) { nextX = BALL_RADIUS; ball.vx *= -0.6; }
-        if (nextX > width - BALL_RADIUS) { nextX = width - BALL_RADIUS; ball.vx *= -0.6; }
+        // 牆壁反彈 (帶一點能量損失)
+        if (nextX < BALL_RADIUS) { nextX = BALL_RADIUS; ball.vx *= -0.7; }
+        if (nextX > width - BALL_RADIUS) { nextX = width - BALL_RADIUS; ball.vx *= -0.7; }
 
-        // 釘子碰撞檢測
+        // 2. 釘子碰撞檢測
         for (let i=0; i<pins.length; i++) {
             const p = pins[i];
             const dx = nextX - p.x;
@@ -395,38 +334,59 @@
             const minDist = BALL_RADIUS + PIN_RADIUS;
 
             if (distSq < minDist * minDist) {
-                // 發生碰撞
+                // 💥 發生碰撞！
                 pinHitIndex = i;
+                
+                // 計算基礎反射角度
                 const angle = Math.atan2(dy, dx);
                 
-                // 🔥 防沾黏關鍵：強制推開到安全距離
+                // --- 作弊核心：幸運反彈 ---
+                // 我們不在半空中推球，而是在球撞到釘子這一瞬間，
+                // 偷偷修改它的「反射角度」，讓它稍微偏向目標一點點。
+                // 這看起來完全符合物理，只是球運氣特別好 (或特別差)。
+                
+                let biasX = 0;
+                if (targetSlotIndex !== -1 && ball.y < height - 100) {
+                    const targetX = slots[targetSlotIndex].cx;
+                    const distToTarget = targetX - ball.x;
+                    
+                    // 根據距離施加微小的偏差 (Bias)
+                    // 越下面，偏差可以稍微大一點點，但依然很微弱
+                    const strength = 0.0008 + (ball.y / height) * 0.002;
+                    biasX = distToTarget * strength; 
+                }
+
+                // 強制推開 (防沾黏)
                 const pushOut = 1.0; 
                 nextX = p.x + Math.cos(angle) * (minDist + pushOut);
                 nextY = p.y + Math.sin(angle) * (minDist + pushOut);
 
-                // 反射速度 + 隨機旋轉造成的水平分量
-                const noise = (Math.random() - 0.5) * 1.5; 
-                ball.vx += Math.cos(angle) * 1.5 + noise; 
-                ball.vy = Math.abs(ball.vy) * -BOUNCE; // Y軸反轉並吸能
+                // 隨機擾動 (Chaos) - 模擬釘子表面不平整
+                const noise = (Math.random() - 0.5) * 1.0; 
+
+                // 新速度 = 反射 + 隨機 + 作弊偏差
+                ball.vx += Math.cos(angle) * 1.2 + noise + biasX;
+                ball.vy = Math.abs(ball.vy) * -BOUNCE; // Y軸反彈並吸能
                 
-                // 確保碰撞後有足夠的水平速度脫離，避免垂直彈跳
-                if(Math.abs(ball.vx) < 0.5) ball.vx += (Math.random() > 0.5 ? 1 : -1);
+                // 確保水平有速度，避免垂直死彈
+                if(Math.abs(ball.vx) < 0.3) ball.vx += (Math.random() > 0.5 ? 0.8 : -0.8);
             }
         }
 
-        // 微風導航 (僅在下半部啟動)
-        if (targetSlotIndex !== -1 && nextY < height - 60) {
+        // 3. 底部強制導流 (Funnel)
+        // 只有在最後 50px (釘子陣列結束後) 才啟動
+        // 確保球不會在最後一刻因為隨機性跳出正確的洞
+        if (targetSlotIndex !== -1 && ball.y > height - 50) {
             const targetX = slots[targetSlotIndex].cx;
             const dist = targetX - ball.x;
-            // 非常微弱的側向推力，隨著高度增加
-            const wind = 0.004 + (nextY / height) * 0.01;
-            ball.vx += dist * wind;
+            ball.vx += dist * 0.05; // 強力導正
+            ball.vx *= 0.9; // 強阻力防止過頭
         }
 
         ball.x = nextX;
         ball.y = nextY;
 
-        // 進洞判定
+        // 4. 進洞判定
         if (ball.y > height - BALL_RADIUS) {
             ball.active = false;
             ball.x = slots[targetSlotIndex].cx;
@@ -459,21 +419,16 @@
             initPhysics();
             draw();
             
-            // 啟動自動更新 (每5秒)
             pollInterval = setInterval(updateData, 5000);
 
         } catch (e) { alert("Connect Failed"); }
     }
 
-    // 整合更新 (餘額 + 獎池)
     async function updateData() {
         if(!contract || !userAddress) return;
         try {
-            // 查獎池
             const bal = await contract.getBankrollBalance();
             document.getElementById("poolAmount").innerText = parseFloat(ethers.formatEther(bal)).toFixed(2) + " CRO";
-            
-            // 查玩家餘額
             const userBal = await provider.getBalance(userAddress);
             document.getElementById("userBalance").innerText = parseFloat(ethers.formatEther(userBal)).toFixed(2);
         } catch(e){}
@@ -482,29 +437,16 @@
     function randomizeConfig() {
         const conf = CONFIGS[Math.floor(Math.random() * CONFIGS.length)];
         currentConfig = conf;
-        
         document.getElementById("disp-multi").innerText = conf.multi + "X";
-        document.getElementById("disp-multi").style.color = getMultiColor(conf.multi);
-
         let all = Array.from({length: NUM_SLOTS}, (_, i) => i);
         activeSlotIndices = all.sort(() => 0.5 - Math.random()).slice(0, conf.lights);
-        validateBet(); // 重置按鈕狀態
-    }
-
-    function getMultiColor(m) {
-        if(m==10) return '#ff0055';
-        if(m==8) return '#ffaa00';
-        return '#00f2ff';
+        validateBet();
     }
 
     function validateBet() {
         const amt = document.getElementById("betAmount").value;
         const btn = document.getElementById("playBtn");
-        if(amt > 0 && currentConfig) {
-            btn.disabled = false;
-        } else {
-            btn.disabled = true;
-        }
+        btn.disabled = !(amt > 0 && currentConfig);
     }
 
     async function playGame() {
@@ -533,7 +475,7 @@
                 } catch(e){}
             }
             startBallDrop(wonMultiplier, payout);
-            updateData(); // 扣款後立即更新餘額
+            updateData(); 
 
         } catch (e) {
             console.error(e);
@@ -553,10 +495,10 @@
             targetSlotIndex = empty[Math.floor(Math.random() * empty.length)];
         }
 
-        // 發射位置隨機化
-        ball.x = width / 2 + (Math.random()-0.5)*40; 
+        // 發射：增加隨機性，避免每次都一樣
+        ball.x = width / 2 + (Math.random()-0.5) * 60; 
         ball.y = 20;
-        ball.vx = (Math.random() - 0.5) * 4; 
+        ball.vx = (Math.random() - 0.5) * 3; 
         ball.vy = 0;
         ball.active = true;
     }
@@ -585,19 +527,9 @@
         btn.innerHTML = `<span data-i18n="play_btn">${getTrans("play_btn")}</span>`;
     }
 
-    // --- UI 輔助 ---
-    function openRules() {
-        document.getElementById("rulesModal").style.display = "flex";
-        updateText();
-    }
-    function closeModal(id) {
-        document.getElementById(id).style.display = "none";
-        if(id === "resultModal") resetUI();
-    }
-    function toggleLang() {
-        curLang = curLang === 'zh' ? 'en' : 'zh';
-        updateText();
-    }
+    function openRules() { document.getElementById("rulesModal").style.display = "flex"; updateText(); }
+    function closeModal(id) { document.getElementById(id).style.display = "none"; if(id === "resultModal") resetUI(); }
+    function toggleLang() { curLang = curLang === 'zh' ? 'en' : 'zh'; updateText(); }
     function getTrans(key) { return i18n[curLang][key]; }
     function updateText() {
         document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -606,13 +538,10 @@
         document.getElementById("rulesContent").innerHTML = i18n[curLang]['rule_html'];
     }
 
-    // 初始執行
     updateText();
     initPhysics();
-    draw(); // 啟動背景渲染
+    draw(); 
 </script>
 
 </body>
 </html>
-
-
