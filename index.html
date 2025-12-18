@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夜市彈珠台 V10 (智能導航版)</title>
+    <title>夜市彈珠台 V11 (風控完善版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
             --bg-dark: #0f0f13;
             --neon-blue: #00f2ff;
             --neon-pink: #ff0055;
+            --neon-green: #00ff99;
             --wood-dark: #1a150e;
         }
 
@@ -21,7 +22,6 @@
             margin: 0; padding: 15px; min-height: 100vh;
         }
 
-        /* 頂部導航 */
         .top-bar {
             width: 100%; max-width: 450px;
             display: flex; justify-content: flex-end; gap: 10px;
@@ -46,19 +46,21 @@
             display: flex; flex-direction: column; align-items: center;
         }
 
+        /* 儀表板更新：三欄式 */
         .dashboard {
-            width: 100%; display: flex; justify-content: space-between;
-            background: #111; padding: 8px 15px; border-radius: 10px;
+            width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;
+            background: #111; padding: 8px 10px; border-radius: 10px;
             margin-bottom: 10px; box-sizing: border-box; border: 1px solid #333;
         }
+        .dash-item { display: flex; flex-direction: column; align-items: center; }
+        .dash-label { font-size: 0.75em; color: #888; margin-bottom: 2px; }
         .dash-val { font-size: 1.1em; font-weight: bold; color: var(--neon-blue); font-family: monospace; }
-
+        
         canvas {
             background: var(--wood-dark);
             border-radius: 12px; border: 2px solid #5c3a1b;
             box-shadow: inset 0 0 60px rgba(0,0,0,0.9);
             margin-bottom: 15px; cursor: pointer;
-            /* 木紋裝飾 */
             background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 10px);
         }
 
@@ -79,7 +81,11 @@
         .input-wrapper {
             display: flex; justify-content: space-between; align-items: center;
             background: #111; padding: 8px 15px; border-radius: 10px; border: 1px solid #333;
+            transition: 0.3s;
         }
+        /* 超出限額時變紅 */
+        .input-wrapper.error { border-color: #ff0055; box-shadow: 0 0 10px rgba(255, 0, 85, 0.3); }
+        
         .bet-input {
             background: transparent; border: none; color: white; font-size: 1.2rem;
             text-align: right; width: 80px; font-weight: bold;
@@ -111,12 +117,22 @@
     <button class="nav-btn" onclick="toggleLang()">EN / 中文</button>
 </div>
 
-<h1><span data-i18n="title">夜市彈珠台</span> <span style="font-size:0.5em; color:#555;">V10</span></h1>
+<h1><span data-i18n="title">夜市彈珠台</span> <span style="font-size:0.5em; color:#555;">V11</span></h1>
 
 <div class="machine">
     <div class="dashboard">
-        <div><span style="font-size:0.8em; color:#888;" data-i18n="multiplier">倍率</span> <span class="dash-val" id="disp-multi" style="color:var(--neon-pink)">--</span></div>
-        <div><span style="font-size:0.8em; color:#888;" data-i18n="pool">獎池</span> <span class="dash-val" id="poolAmount" style="color:#ffcc00">--</span></div>
+        <div class="dash-item">
+            <span class="dash-label" data-i18n="multiplier">倍率</span>
+            <span class="dash-val" id="disp-multi" style="color:var(--neon-pink)">--</span>
+        </div>
+        <div class="dash-item">
+            <span class="dash-label" data-i18n="max_bet">最大下注</span>
+            <span class="dash-val" id="maxBetVal" style="color:var(--neon-green)">--</span>
+        </div>
+        <div class="dash-item">
+            <span class="dash-label" data-i18n="pool">總獎池</span>
+            <span class="dash-val" id="poolAmount" style="color:#ffcc00">--</span>
+        </div>
     </div>
 
     <canvas id="gameCanvas" width="400" height="620"></canvas>
@@ -132,7 +148,7 @@
 
             <button class="btn btn-random" id="randomBtn" onclick="randomizeConfig()"><span data-i18n="random_btn">🎰 投幣選台</span></button>
             
-            <div class="input-wrapper">
+            <div class="input-wrapper" id="betWrapper">
                 <span style="color:#aaa; font-size:0.9em;" data-i18n="bet">下注</span>
                 <div>
                     <input type="number" id="betAmount" value="1" class="bet-input" oninput="validateBet()">
@@ -171,24 +187,24 @@
 
     const i18n = {
         zh: {
-            title: "夜市彈珠台", rules: "規則", connect: "連接錢包", multiplier: "倍率", pool: "獎池",
+            title: "夜市彈珠台", rules: "規則", connect: "連接錢包", multiplier: "倍率", pool: "獎池", max_bet: "最大下注",
             balance: "餘額", random_btn: "🎰 投幣選台 (隨機配置)", bet: "下注", play_btn: "🔴 拉桿發射",
             rules_title: "📜 遊戲規則", close: "關閉", confirm: "確定",
             win: "🎉 中獎啦！", lose: "😢 沒中...", waiting: "確認中...", rolling: "彈珠滾動中...",
             rule_html: `
                 <div class="rule-row">1. 點擊「投幣選台」隨機切換倍率。</div>
-                <div class="rule-row">2. 倍率越高，亮燈洞口越少。</div>
+                <div class="rule-row">2. 倍率越高，最大可下注金額越低。</div>
                 <div class="rule-row">3. 彈珠落入「亮燈」洞口即中獎。</div>
             `
         },
         en: {
-            title: "Pinball", rules: "Rules", connect: "Connect", multiplier: "Multi", pool: "Pool",
+            title: "Pinball", rules: "Rules", connect: "Connect", multiplier: "Multi", pool: "Pool", max_bet: "Max Bet",
             balance: "Bal", random_btn: "🎰 Random Setup", bet: "Bet", play_btn: "🔴 Launch",
             rules_title: "📜 Rules", close: "Close", confirm: "OK",
             win: "🎉 YOU WIN!", lose: "😢 MISSED...", waiting: "Confirming...", rolling: "Rolling...",
             rule_html: `
                 <div class="rule-row">1. Click 'Random Setup' to start.</div>
-                <div class="rule-row">2. Higher multiplier = fewer lights.</div>
+                <div class="rule-row">2. Higher multiplier = Lower Max Bet.</div>
                 <div class="rule-row">3. Land in a LIT slot to win.</div>
             `
         }
@@ -204,13 +220,12 @@
     ];
     const NUM_SLOTS = 10;
     
-    // 物理引擎變數
+    // 物理引擎
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
 
-    // V10: 稍微調高重力，讓手感扎實一點，靠邏輯解決亂飛問題
     const GRAVITY = 0.12;       
     const BOUNCE = 0.5;         
     const FRICTION = 0.99;      
@@ -221,9 +236,9 @@
     let pins = [];
     let slots = [];
     let activeSlotIndices = [];
-    let targetSlotIndex = -1; // 最終落點
+    let targetSlotIndex = -1;
     let pinHitIndex = -1; 
-    let mustWin = false; // V10: 記錄是否必須中獎
+    let mustWin = false;
 
     function initPhysics() {
         pins = [];
@@ -246,7 +261,6 @@
                 });
             }
         }
-
         const slotWidth = width / NUM_SLOTS;
         slots = [];
         for(let i=0; i<NUM_SLOTS; i++) {
@@ -261,33 +275,23 @@
     function draw() {
         ctx.fillStyle = '#1a150e';
         ctx.fillRect(0, 0, width, height);
-
         pins.forEach((p, i) => {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
-            if (i === pinHitIndex) {
-                ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#fff';
-            } else {
-                ctx.fillStyle = '#999'; ctx.shadowBlur = 0;
-            }
+            ctx.beginPath(); ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
+            if (i === pinHitIndex) { ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#fff'; } 
+            else { ctx.fillStyle = '#999'; ctx.shadowBlur = 0; }
             ctx.fill();
         });
-        ctx.shadowBlur = 0;
-        if(pinHitIndex !== -1) pinHitIndex = -1;
+        ctx.shadowBlur = 0; if(pinHitIndex !== -1) pinHitIndex = -1;
 
         for(let i=0; i<NUM_SLOTS; i++) {
             const s = slots[i];
             const isLit = activeSlotIndices.includes(i);
-            
-            ctx.fillStyle = '#111';
-            ctx.fillRect(s.x+1, height-40, s.w-2, 40);
-            
+            ctx.fillStyle = '#111'; ctx.fillRect(s.x+1, height-40, s.w-2, 40);
             if(isLit) {
                 ctx.fillStyle = '#00f2ff'; ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
                 ctx.beginPath(); ctx.arc(s.cx, height-25, 5, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
             } else {
-                ctx.fillStyle = '#333';
-                ctx.beginPath(); ctx.arc(s.cx, height-25, 3, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(s.cx, height-25, 3, 0, Math.PI*2); ctx.fill();
             }
             ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.moveTo(s.x, height-40); ctx.lineTo(s.x, height); ctx.stroke();
         }
@@ -298,37 +302,24 @@
             ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x-2, ball.y-2, 2, 0, Math.PI*2); ctx.fill();
         }
-
         requestAnimationFrame(draw);
     }
 
-    // 🔥 V10: 智能就近導航 (Nearest Neighbor Guidance)
     function updatePhysics() {
-        ball.vy += GRAVITY;
-        ball.vx *= FRICTION;
-        ball.vy *= FRICTION;
-        
-        let nextX = ball.x + ball.vx;
-        let nextY = ball.y + ball.vy;
+        ball.vy += GRAVITY; ball.vx *= FRICTION; ball.vy *= FRICTION;
+        let nextX = ball.x + ball.vx; let nextY = ball.y + ball.vy;
 
         if (nextX < BALL_RADIUS) { nextX = BALL_RADIUS; ball.vx *= -0.7; }
         if (nextX > width - BALL_RADIUS) { nextX = width - BALL_RADIUS; ball.vx *= -0.7; }
 
         for (let i=0; i<pins.length; i++) {
-            const p = pins[i];
-            const dx = nextX - p.x;
-            const dy = nextY - p.y;
-            const distSq = dx*dx + dy*dy;
-            const minDist = BALL_RADIUS + PIN_RADIUS;
-
+            const p = pins[i]; const dx = nextX - p.x; const dy = nextY - p.y;
+            const distSq = dx*dx + dy*dy; const minDist = BALL_RADIUS + PIN_RADIUS;
             if (distSq < minDist * minDist) {
                 pinHitIndex = i;
                 const angle = Math.atan2(dy, dx);
-                const pushOut = 1.0; 
-                nextX = p.x + Math.cos(angle) * (minDist + pushOut);
-                nextY = p.y + Math.sin(angle) * (minDist + pushOut);
-                
-                // 隨機反彈 (沒有作弊，純物理)
+                nextX = p.x + Math.cos(angle) * (minDist + 1.0);
+                nextY = p.y + Math.sin(angle) * (minDist + 1.0);
                 const noise = (Math.random() - 0.5) * 1.5; 
                 ball.vx += Math.cos(angle) * 1.5 + noise;
                 ball.vy = Math.abs(ball.vy) * -BOUNCE; 
@@ -336,56 +327,32 @@
             }
         }
 
-        // 🔥 V10 核心：通過釘子區後 (y > 450)，才開始尋找最近的目標
-        // 這樣球就不會從上面橫跨飛下來
         if (ball.y > 450 && ball.y < height - 50) {
-            let bestTargetX = -1;
-            let minDistance = 9999;
-
-            // 根據輸贏，找出所有合法的洞口
-            // 如果要贏：找亮燈的洞
-            // 如果要輸：找沒亮燈的洞
+            let bestTargetX = -1; let minDistance = 9999;
             const validIndices = mustWin ? activeSlotIndices : 
                 Array.from({length: NUM_SLOTS}, (_, i) => i).filter(i => !activeSlotIndices.includes(i));
-
-            // 在所有合法洞口中，找出「離目前球位置最近」的那一個
             validIndices.forEach(idx => {
-                const cx = slots[idx].cx;
-                const dist = Math.abs(ball.x - cx);
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    bestTargetX = cx;
-                    targetSlotIndex = idx; // 更新最終落點
-                }
+                const cx = slots[idx].cx; const dist = Math.abs(ball.x - cx);
+                if (dist < minDistance) { minDistance = dist; bestTargetX = cx; targetSlotIndex = idx; }
             });
-
-            // 施加微弱導引力，推向那個最近的合法洞口
             if (bestTargetX !== -1) {
                 const distToTarget = bestTargetX - ball.x;
-                // 越接近底部，導引力稍微強一點點，確保進去
                 const strength = 0.005 + (ball.y / height) * 0.02; 
                 ball.vx += distToTarget * strength;
             }
         }
-
-        ball.x = nextX;
-        ball.y = nextY;
-
+        ball.x = nextX; ball.y = nextY;
         if (ball.y > height - BALL_RADIUS) {
             ball.active = false;
-            // 視覺修正：確保落在洞中央
-            if(targetSlotIndex !== -1) {
-                ball.x = slots[targetSlotIndex].cx;
-            }
-            ball.y = height - 25;
-            setTimeout(showResult, 200);
+            if(targetSlotIndex !== -1) ball.x = slots[targetSlotIndex].cx;
+            ball.y = height - 25; setTimeout(showResult, 200);
         }
     }
 
     let provider, signer, contract, userAddress;
     let currentConfig = null;
     let pendingResult = null;
-    let pollInterval;
+    let poolBalanceEth = 0; // 🔥 記錄獎池金額 (浮點數)
 
     async function connectWallet() {
         if (!window.ethereum) return alert("Please install MetaMask");
@@ -393,20 +360,15 @@
             provider = new ethers.BrowserProvider(window.ethereum);
             signer = await provider.getSigner();
             userAddress = await signer.getAddress();
-            
             document.getElementById("connectBtn").style.display = "none";
             document.getElementById("gameUI").style.display = "flex";
             document.getElementById("walletAddr").innerText = userAddress.substring(0,6) + "...";
-
             contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-            
             await updateData();
             randomizeConfig();
             initPhysics();
             draw();
-            
-            pollInterval = setInterval(updateData, 5000);
-
+            setInterval(updateData, 5000);
         } catch (e) { alert("Connect Failed"); }
     }
 
@@ -414,9 +376,14 @@
         if(!contract || !userAddress) return;
         try {
             const bal = await contract.getBankrollBalance();
-            document.getElementById("poolAmount").innerText = parseFloat(ethers.formatEther(bal)).toFixed(2) + " CRO";
+            poolBalanceEth = parseFloat(ethers.formatEther(bal)); // 存下來
+            document.getElementById("poolAmount").innerText = poolBalanceEth.toFixed(2);
+            
             const userBal = await provider.getBalance(userAddress);
             document.getElementById("userBalance").innerText = parseFloat(ethers.formatEther(userBal)).toFixed(2);
+            
+            // 更新限額
+            validateBet();
         } catch(e){}
     }
 
@@ -426,13 +393,32 @@
         document.getElementById("disp-multi").innerText = conf.multi + "X";
         let all = Array.from({length: NUM_SLOTS}, (_, i) => i);
         activeSlotIndices = all.sort(() => 0.5 - Math.random()).slice(0, conf.lights);
-        validateBet();
+        validateBet(); // 重新計算限額
     }
 
+    // 🔥 V11: 計算並顯示最大下注
     function validateBet() {
-        const amt = document.getElementById("betAmount").value;
+        if (!currentConfig) return;
+
+        // 公式：最大下注 = (池子/4) / 倍率
+        let maxBet = (poolBalanceEth / 4) / currentConfig.multi;
+        
+        // 顯示在 UI
+        document.getElementById("maxBetVal").innerText = maxBet.toFixed(2);
+
+        // 檢查輸入
+        const input = document.getElementById("betAmount");
+        const amt = parseFloat(input.value);
         const btn = document.getElementById("playBtn");
-        btn.disabled = !(amt > 0 && currentConfig);
+        const wrapper = document.getElementById("betWrapper");
+
+        if(amt > 0 && amt <= maxBet) {
+            btn.disabled = false;
+            wrapper.classList.remove("error");
+        } else {
+            btn.disabled = true;
+            wrapper.classList.add("error"); // 變紅
+        }
     }
 
     async function playGame() {
@@ -472,9 +458,7 @@
 
     function startBallDrop(multiplier, payout) {
         pendingResult = { payout, win: multiplier > 0 };
-        mustWin = multiplier > 0; // 設定 V10 導航目標類型
-
-        // 初始完全隨機
+        mustWin = multiplier > 0;
         ball.x = width / 2 + (Math.random()-0.5) * 60; 
         ball.y = 20;
         ball.vx = (Math.random() - 0.5) * 3; 
@@ -524,4 +508,3 @@
 
 </body>
 </html>
-
