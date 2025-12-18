@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夜市彈珠台 V6 (Canvas物理引擎版)</title>
+    <title>夜市彈珠台 V7 (帕青哥物理版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         body {
@@ -28,7 +28,7 @@
         .container {
             position: relative;
             background: #1a1a24;
-            padding: 20px;
+            padding: 15px;
             border-radius: 20px;
             border: 2px solid #2d2d3d;
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
@@ -43,29 +43,35 @@
             display: flex;
             justify-content: space-between;
             width: 100%;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             background: #0b0b13;
-            padding: 10px;
+            padding: 8px 15px;
             border-radius: 8px;
             border: 1px solid #333;
+            box-sizing: border-box;
             font-family: monospace;
             font-size: 1.1em;
         }
 
-        /* 遊戲畫布 */
+        /* 遊戲畫布 - 拉高高度 */
         canvas {
             background: #201c2b;
             border-radius: 12px;
             border: 2px solid #333;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
             margin-bottom: 15px;
+            /* 背景網格裝飾 */
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
         }
 
         .controls {
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .btn {
@@ -116,7 +122,7 @@
 </head>
 <body>
 
-<h1>夜市彈珠台 <span style="font-size:0.5em; color:#888;">V6</span></h1>
+<h1>夜市彈珠台 <span style="font-size:0.5em; color:#888;">V7</span></h1>
 
 <div class="container">
     <div class="info-bar">
@@ -124,7 +130,7 @@
         <span id="poolAmount" style="color:#00f260">獎池: --</span>
     </div>
 
-    <canvas id="gameCanvas" width="400" height="500"></canvas>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
 
     <div style="font-size:0.8em; color:#666; margin-bottom:10px;" id="statusText">請先連接錢包</div>
 
@@ -158,7 +164,6 @@
         "event BallShot(address indexed player, uint256 betAmount, uint256 multiplier, uint256 payout)"
     ];
 
-    // --- 遊戲設定 ---
     const CONFIGS = [
         { multi: 2, lights: 4 },
         { multi: 4, lights: 3 },
@@ -167,118 +172,126 @@
         { multi: 10, lights: 1 }
     ];
     
-    // 10個格子的配置
+    // 10格配置
     const NUM_SLOTS = 10;
     
-    // --- 物理引擎變數 ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
 
-    // 物理參數 (你可以調這裡來改變手感！)
-    const GRAVITY = 0.2;      // 重力 (越小越慢)
-    const BOUNCE = 0.2;        // 彈力 (0.1~0.9)
-    const FRICTION = 0.99;     // 空氣阻力
-    const PIN_RADIUS = 4;
-    const BALL_RADIUS = 7;
+    // --- V7 物理參數 (慢速擬真) ---
+    const GRAVITY = 0.12;       // 重力 (很輕，像羽毛球)
+    const BOUNCE = 0.4;         // 彈性 (低彈性，撞到會吸能，不會往上飛)
+    const FRICTION = 0.98;      // 空氣阻力
+    const PIN_RADIUS = 3;
+    const BALL_RADIUS = 6;
+    const MAX_SPEED = 6;        // 限速 (防止穿牆或飛天)
 
     let ball = { x: 0, y: 0, vx: 0, vy: 0, active: false };
     let pins = [];
-    let slots = []; // 底部洞口資訊
-    let activeSlotIndices = []; // 亮燈的洞
-    let targetSlotIndex = -1;   // 目標洞口
+    let slots = [];
+    let activeSlotIndices = [];
+    let targetSlotIndex = -1;
 
-    // 初始化物理場景
+    // 初始化場景 (帕青哥風格)
     function initPhysics() {
         pins = [];
-        // 生成金字塔型釘子
-        const rows = 10;
+        // 增加到 12 排釘子，創造漫長的落下過程
+        const rows = 12; 
+        const startY = 80;
+        const spacingY = 35; // 垂直間距
+
         for (let r = 0; r < rows; r++) {
-            const cols = r + 3; // 每排增加釘子
-            for (let c = 0; c < cols; c++) {
-                const x = width / 2 - ((cols - 1) * 35) / 2 + c * 35;
-                const y = 80 + r * 30;
-                // 錯位排列
-                pins.push({ x: x, y: y });
+            // 每排釘子數量交錯 (8個 或 9個)
+            // 這樣球落下時一定會撞到下一排的中間 (Galton Board 原理)
+            const pinsInRow = (r % 2 === 0) ? 9 : 10;
+            const spacingX = width / (pinsInRow + 1);
+
+            for (let c = 1; c <= pinsInRow; c++) {
+                const x = c * spacingX;
+                const y = startY + r * spacingY;
+                // 加入一點點隨機擾動，讓排列不那麼死板
+                const jitter = (Math.random() - 0.5) * 4; 
+                pins.push({ x: x + jitter, y: y });
             }
         }
 
-        // 定義底部洞口 (10格)
+        // 底部洞口
         const slotWidth = width / NUM_SLOTS;
         slots = [];
         for(let i=0; i<NUM_SLOTS; i++) {
             slots.push({
                 x: i * slotWidth,
                 w: slotWidth,
-                cx: i * slotWidth + slotWidth / 2, // 中心點
+                cx: i * slotWidth + slotWidth / 2,
                 lit: false
             });
         }
     }
 
-    // 繪製迴圈 (60FPS)
     function draw() {
         ctx.clearRect(0, 0, width, height);
 
         // 1. 畫釘子
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = '#eee';
         pins.forEach(p => {
             ctx.beginPath();
             ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
             ctx.fill();
-            // 釘子光暈
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = 'rgba(255,255,255,0.5)';
         });
-        ctx.shadowBlur = 0;
 
-        // 2. 畫洞口與亮燈
-        const slotW = width / NUM_SLOTS;
+        // 2. 畫洞口
         for(let i=0; i<NUM_SLOTS; i++) {
             const s = slots[i];
             
-            // 洞口背景
-            ctx.fillStyle = '#1a1a24';
-            ctx.fillRect(s.x + 2, height - 40, s.w - 4, 30);
+            // 亮燈判定
+            const isLit = activeSlotIndices.includes(i);
             
-            // 亮燈效果
-            if(activeSlotIndices.includes(i)) {
-                ctx.fillStyle = '#00f7ff';
+            // 繪製洞口
+            ctx.fillStyle = '#1a1a24';
+            ctx.fillRect(s.x + 2, height - 40, s.w - 4, 40);
+            
+            // 燈號
+            if(isLit) {
+                // 霓虹光暈
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = '#00f7ff';
+                ctx.fillStyle = '#00f7ff';
                 ctx.beginPath();
-                ctx.arc(s.cx, height - 25, 6, 0, Math.PI * 2);
+                ctx.arc(s.cx, height - 25, 5, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.shadowBlur = 0;
             } else {
+                // 熄滅狀態
                 ctx.fillStyle = '#333';
                 ctx.beginPath();
-                ctx.arc(s.cx, height - 25, 4, 0, Math.PI * 2);
+                ctx.arc(s.cx, height - 25, 3, 0, Math.PI * 2);
                 ctx.fill();
             }
             
             // 分隔線
-            ctx.strokeStyle = '#444';
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(s.x, height - 40);
             ctx.lineTo(s.x, height);
             ctx.stroke();
         }
 
-        // 3. 畫球 & 物理計算
+        // 3. 畫球 & 物理
         if (ball.active) {
             updatePhysics();
             
-            ctx.fillStyle = '#ff00de';
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#ff00de';
+            ctx.fillStyle = '#ff00de';
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
             
-            // 白色高光
+            // 高光
+            ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(ball.x - 2, ball.y - 2, 2, 0, Math.PI * 2);
@@ -288,75 +301,83 @@
         requestAnimationFrame(draw);
     }
 
-    // 物理核心
+    // 🔥 V7 物理核心 (修復飛天、增加微風)
     function updatePhysics() {
-        // 重力
+        // 1. 重力與阻力
         ball.vy += GRAVITY;
         ball.vx *= FRICTION;
-        
-        // 移動
+        ball.vy *= FRICTION;
+
+        // 2. 速度限制 (防飛天)
+        const speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+        if (speed > MAX_SPEED) {
+            const ratio = MAX_SPEED / speed;
+            ball.vx *= ratio;
+            ball.vy *= ratio;
+        }
+
+        // 3. 移動
         ball.x += ball.vx;
         ball.y += ball.vy;
 
-        // 牆壁碰撞
-        if (ball.x < BALL_RADIUS) { ball.x = BALL_RADIUS; ball.vx *= -0.7; }
-        if (ball.x > width - BALL_RADIUS) { ball.x = width - BALL_RADIUS; ball.vx *= -0.7; }
+        // 4. 牆壁反彈
+        if (ball.x < BALL_RADIUS) { ball.x = BALL_RADIUS; ball.vx *= -0.6; }
+        if (ball.x > width - BALL_RADIUS) { ball.x = width - BALL_RADIUS; ball.vx *= -0.6; }
 
-        // 釘子碰撞 (圓形碰撞檢測)
+        // 5. 釘子碰撞 (重點優化)
         for (let p of pins) {
+            // 簡單的圓形碰撞檢測
             const dx = ball.x - p.x;
             const dy = ball.y - p.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
+            const distSq = dx*dx + dy*dy;
             const minDist = BALL_RADIUS + PIN_RADIUS;
 
-            if (dist < minDist) {
-                // 計算碰撞角度
+            if (distSq < minDist * minDist) {
+                // 發生碰撞！
                 const angle = Math.atan2(dy, dx);
                 
-                // 彈開向量
-                const force = 0.5; // 彈力係數
-                const tx = Math.cos(angle) * minDist;
-                const ty = Math.sin(angle) * minDist;
-                
-                // 修正位置 (避免卡在釘子裡)
-                ball.x = p.x + tx;
-                ball.y = p.y + ty;
+                // 強制把球推到釘子外面 (避免黏住或穿越)
+                const pushOut = 1.0; 
+                ball.x = p.x + Math.cos(angle) * (minDist + pushOut);
+                ball.y = p.y + Math.sin(angle) * (minDist + pushOut);
 
-                // 改變速度 (反射)
-                // 這裡用簡單的隨機擾動模擬不規則彈跳
-                ball.vx += Math.cos(angle) * 2 + (Math.random() - 0.5); 
-                ball.vy *= -0.6; // 損失動能
-                ball.vy += Math.sin(angle) * 2;
+                // 計算新的速度 (反射)
+                // 加入一點隨機性，模擬不規則表面
+                const noise = (Math.random() - 0.5) * 0.5;
+                
+                // 撞擊後獲得一個向外的推力，但會損失大量 Y 軸動能
+                ball.vx += Math.cos(angle + noise) * 1.5; 
+                ball.vy = Math.abs(ball.vy) * -BOUNCE; // 強制反轉 Y 並衰減 (不會往上飛太高)
             }
         }
 
-        // 🔥 磁鐵導航系統 (作弊核心) 🔥
-        // 當球落下超過一半高度時，開始微調它的軌跡去目標洞口
-        if (targetSlotIndex !== -1 && ball.y > 150 && ball.y < 350) {
+        // 6. 微風導航 (Invisible Wind)
+        // 這是最自然的作弊方式：不是硬拉，而是持續吹微風
+        if (targetSlotIndex !== -1 && ball.y < height - 50) {
             const targetX = slots[targetSlotIndex].cx;
-            const dx = targetX - ball.x;
+            const dist = targetX - ball.x;
             
-            // 只施加微弱的側向力，看起來像運氣
-            // 越接近底部，導正力量越強
-            const strength = 0.005 + (ball.y / height) * 0.01; 
-            ball.vx += dx * strength;
+            // 風力隨著球下降而稍微增強
+            // 在上半部幾乎沒有風，下半部風稍微大一點點
+            const windStrength = 0.005 + (ball.y / height) * 0.015;
+            
+            ball.vx += dist * windStrength;
         }
 
-        // 落到底部
-        if (ball.y > height - 40) {
+        // 7. 進洞判定
+        if (ball.y > height - BALL_RADIUS) {
             ball.active = false;
-            // 修正最終位置到洞口中心
+            // 視覺修正：讓球停在洞口正中央
             ball.x = slots[targetSlotIndex].cx;
             ball.y = height - 25;
-            
-            // 觸發結果
-            setTimeout(showResult, 200);
+            setTimeout(showResult, 300);
         }
     }
 
-    // --- Web3 邏輯 ---
+    // --- Web3 與遊戲邏輯 ---
     let provider, signer, contract, userAddress;
     let currentConfig = null;
+    let pendingResult = null;
 
     async function connectWallet() {
         if (!window.ethereum) return alert("請安裝 MetaMask");
@@ -374,7 +395,6 @@
             updatePool();
             randomizeConfig();
             
-            // 啟動繪圖
             initPhysics();
             draw();
 
@@ -390,23 +410,22 @@
     }
 
     function randomizeConfig() {
+        activeSlotIndices = [];
         const conf = CONFIGS[Math.floor(Math.random() * CONFIGS.length)];
         currentConfig = conf;
         document.getElementById("current-multi").innerText = "倍率: " + conf.multi + "X";
 
-        // 隨機亮燈
         let all = Array.from({length: NUM_SLOTS}, (_, i) => i);
-        // 洗牌
         activeSlotIndices = all.sort(() => 0.5 - Math.random()).slice(0, conf.lights);
     }
 
     async function playGame() {
         if (!currentConfig) return alert("請先選台");
         const amt = document.getElementById("betAmount").value;
-        
         const playBtn = document.getElementById("playBtn");
+        
         playBtn.disabled = true;
-        playBtn.innerText = "確認中...";
+        playBtn.innerText = "確認交易中...";
 
         try {
             const tx = await contract.play(currentConfig.multi, { value: ethers.parseEther(amt) });
@@ -426,7 +445,7 @@
                 } catch(e){}
             }
 
-            // 設定物理目標
+            playBtn.innerText = "球滾動中...";
             startBallDrop(wonMultiplier, payout);
 
         } catch (e) {
@@ -437,26 +456,22 @@
         }
     }
 
-    let pendingResult = { payout: 0, win: false };
-
     function startBallDrop(multiplier, payout) {
         pendingResult = { payout, win: multiplier > 0 };
         
-        // 決定目標洞口
+        // 決定目標
         if (multiplier > 0) {
-            // 贏：一定要掉進亮燈的洞
             targetSlotIndex = activeSlotIndices[Math.floor(Math.random() * activeSlotIndices.length)];
         } else {
-            // 輸：一定要掉進沒亮燈的洞
             let all = Array.from({length: NUM_SLOTS}, (_, i) => i);
             let empty = all.filter(i => !activeSlotIndices.includes(i));
             targetSlotIndex = empty[Math.floor(Math.random() * empty.length)];
         }
 
-        // 重置球的位置
-        ball.x = width / 2 + (Math.random() - 0.5) * 20; // 稍微隨機的出生點
+        // 發射球
+        ball.x = width / 2 + (Math.random()-0.5)*20; 
         ball.y = 20;
-        ball.vx = (Math.random() - 0.5) * 4; // 隨機初始推力
+        ball.vx = (Math.random() - 0.5) * 2; 
         ball.vy = 0;
         ball.active = true;
     }
@@ -485,13 +500,9 @@
         document.getElementById("playBtn").innerText = "🔴 發射彈珠";
     }
 
-    // 啟動畫面
     initPhysics();
-    draw();
 </script>
 
 </body>
 </html>
-
-
 
