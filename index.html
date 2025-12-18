@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夜市彈珠台 V9 (擬真慢速版)</title>
+    <title>夜市彈珠台 V10 (智能導航版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
@@ -53,12 +53,13 @@
         }
         .dash-val { font-size: 1.1em; font-weight: bold; color: var(--neon-blue); font-family: monospace; }
 
-        /* 遊戲畫布 - 更加高，讓球滾更久 */
         canvas {
             background: var(--wood-dark);
             border-radius: 12px; border: 2px solid #5c3a1b;
             box-shadow: inset 0 0 60px rgba(0,0,0,0.9);
             margin-bottom: 15px; cursor: pointer;
+            /* 木紋裝飾 */
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 10px);
         }
 
         .controls { width: 100%; display: flex; flex-direction: column; gap: 8px; }
@@ -87,7 +88,6 @@
 
         .wallet-info { font-size: 0.8em; color: #888; margin-top: 5px; display: flex; justify-content: space-between; width: 100%; }
 
-        /* 彈窗 */
         .modal-overlay {
             position: fixed; top:0; left:0; width:100%; height:100%;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
@@ -111,7 +111,7 @@
     <button class="nav-btn" onclick="toggleLang()">EN / 中文</button>
 </div>
 
-<h1><span data-i18n="title">夜市彈珠台</span> <span style="font-size:0.5em; color:#555;">V9</span></h1>
+<h1><span data-i18n="title">夜市彈珠台</span> <span style="font-size:0.5em; color:#555;">V10</span></h1>
 
 <div class="machine">
     <div class="dashboard">
@@ -195,7 +195,6 @@
     };
     let curLang = 'zh';
 
-    // 遊戲設定
     const CONFIGS = [
         { multi: 2, lights: 4 },
         { multi: 4, lights: 3 },
@@ -205,16 +204,16 @@
     ];
     const NUM_SLOTS = 10;
     
-    // --- V9 物理引擎變數 (擬真慢速) ---
+    // 物理引擎變數
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
 
-    // 🔥 極低重力與高阻力，製造「水下/月球」感
-    const GRAVITY = 0.08;       // 重力極小
-    const BOUNCE = 0.55;        // 彈力適中
-    const FRICTION = 0.992;     // 空氣阻力小，保持動量
+    // V10: 稍微調高重力，讓手感扎實一點，靠邏輯解決亂飛問題
+    const GRAVITY = 0.12;       
+    const BOUNCE = 0.5;         
+    const FRICTION = 0.99;      
     const PIN_RADIUS = 3;
     const BALL_RADIUS = 6;
 
@@ -222,29 +221,25 @@
     let pins = [];
     let slots = [];
     let activeSlotIndices = [];
-    let targetSlotIndex = -1;
+    let targetSlotIndex = -1; // 最終落點
     let pinHitIndex = -1; 
+    let mustWin = false; // V10: 記錄是否必須中獎
 
-    // 初始化物理場景 (更密集的釘子陣列)
     function initPhysics() {
         pins = [];
-        // 增加到 14 排，讓球必須經過更多碰撞
-        const rows = 14; 
+        const rows = 13; 
         const startY = 80;
-        const spacingY = 32; // 更密集的垂直間距
+        const spacingY = 35;
 
         for (let r = 0; r < rows; r++) {
-            // 讓釘子數量更多 (9 或 10)，增加碰撞機會
             const isEven = r % 2 === 0;
             const cols = isEven ? 9 : 10;
             const rowWidth = (cols - 1) * 38;
             const offsetX = (width - rowWidth) / 2;
 
             for (let c = 0; c < cols; c++) {
-                // 隨機擾動，讓釘子不是完美排列
                 const jitterX = (Math.random() - 0.5) * 8; 
                 const jitterY = (Math.random() - 0.5) * 8;
-                
                 pins.push({
                     x: offsetX + c * 38 + jitterX,
                     y: startY + r * spacingY + jitterY
@@ -252,7 +247,6 @@
             }
         }
 
-        // 底部洞口
         const slotWidth = width / NUM_SLOTS;
         slots = [];
         for(let i=0; i<NUM_SLOTS; i++) {
@@ -268,7 +262,6 @@
         ctx.fillStyle = '#1a150e';
         ctx.fillRect(0, 0, width, height);
 
-        // 1. 畫釘子
         pins.forEach((p, i) => {
             ctx.beginPath();
             ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
@@ -282,7 +275,6 @@
         ctx.shadowBlur = 0;
         if(pinHitIndex !== -1) pinHitIndex = -1;
 
-        // 2. 畫洞口
         for(let i=0; i<NUM_SLOTS; i++) {
             const s = slots[i];
             const isLit = activeSlotIndices.includes(i);
@@ -300,7 +292,6 @@
             ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.moveTo(s.x, height-40); ctx.lineTo(s.x, height); ctx.stroke();
         }
 
-        // 3. 畫球
         if (ball.active) {
             updatePhysics();
             ctx.fillStyle = '#ff0055'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055';
@@ -311,9 +302,8 @@
         requestAnimationFrame(draw);
     }
 
-    // 🔥 V9 物理核心：幸運反彈算法 (Lucky Bounce)
+    // 🔥 V10: 智能就近導航 (Nearest Neighbor Guidance)
     function updatePhysics() {
-        // 1. 物理運動
         ball.vy += GRAVITY;
         ball.vx *= FRICTION;
         ball.vy *= FRICTION;
@@ -321,11 +311,9 @@
         let nextX = ball.x + ball.vx;
         let nextY = ball.y + ball.vy;
 
-        // 牆壁反彈 (帶一點能量損失)
         if (nextX < BALL_RADIUS) { nextX = BALL_RADIUS; ball.vx *= -0.7; }
         if (nextX > width - BALL_RADIUS) { nextX = width - BALL_RADIUS; ball.vx *= -0.7; }
 
-        // 2. 釘子碰撞檢測
         for (let i=0; i<pins.length; i++) {
             const p = pins[i];
             const dx = nextX - p.x;
@@ -334,68 +322,66 @@
             const minDist = BALL_RADIUS + PIN_RADIUS;
 
             if (distSq < minDist * minDist) {
-                // 💥 發生碰撞！
                 pinHitIndex = i;
-                
-                // 計算基礎反射角度
                 const angle = Math.atan2(dy, dx);
-                
-                // --- 作弊核心：幸運反彈 ---
-                // 我們不在半空中推球，而是在球撞到釘子這一瞬間，
-                // 偷偷修改它的「反射角度」，讓它稍微偏向目標一點點。
-                // 這看起來完全符合物理，只是球運氣特別好 (或特別差)。
-                
-                let biasX = 0;
-                if (targetSlotIndex !== -1 && ball.y < height - 100) {
-                    const targetX = slots[targetSlotIndex].cx;
-                    const distToTarget = targetX - ball.x;
-                    
-                    // 根據距離施加微小的偏差 (Bias)
-                    // 越下面，偏差可以稍微大一點點，但依然很微弱
-                    const strength = 0.0008 + (ball.y / height) * 0.002;
-                    biasX = distToTarget * strength; 
-                }
-
-                // 強制推開 (防沾黏)
                 const pushOut = 1.0; 
                 nextX = p.x + Math.cos(angle) * (minDist + pushOut);
                 nextY = p.y + Math.sin(angle) * (minDist + pushOut);
-
-                // 隨機擾動 (Chaos) - 模擬釘子表面不平整
-                const noise = (Math.random() - 0.5) * 1.0; 
-
-                // 新速度 = 反射 + 隨機 + 作弊偏差
-                ball.vx += Math.cos(angle) * 1.2 + noise + biasX;
-                ball.vy = Math.abs(ball.vy) * -BOUNCE; // Y軸反彈並吸能
                 
-                // 確保水平有速度，避免垂直死彈
+                // 隨機反彈 (沒有作弊，純物理)
+                const noise = (Math.random() - 0.5) * 1.5; 
+                ball.vx += Math.cos(angle) * 1.5 + noise;
+                ball.vy = Math.abs(ball.vy) * -BOUNCE; 
                 if(Math.abs(ball.vx) < 0.3) ball.vx += (Math.random() > 0.5 ? 0.8 : -0.8);
             }
         }
 
-        // 3. 底部強制導流 (Funnel)
-        // 只有在最後 50px (釘子陣列結束後) 才啟動
-        // 確保球不會在最後一刻因為隨機性跳出正確的洞
-        if (targetSlotIndex !== -1 && ball.y > height - 50) {
-            const targetX = slots[targetSlotIndex].cx;
-            const dist = targetX - ball.x;
-            ball.vx += dist * 0.05; // 強力導正
-            ball.vx *= 0.9; // 強阻力防止過頭
+        // 🔥 V10 核心：通過釘子區後 (y > 450)，才開始尋找最近的目標
+        // 這樣球就不會從上面橫跨飛下來
+        if (ball.y > 450 && ball.y < height - 50) {
+            let bestTargetX = -1;
+            let minDistance = 9999;
+
+            // 根據輸贏，找出所有合法的洞口
+            // 如果要贏：找亮燈的洞
+            // 如果要輸：找沒亮燈的洞
+            const validIndices = mustWin ? activeSlotIndices : 
+                Array.from({length: NUM_SLOTS}, (_, i) => i).filter(i => !activeSlotIndices.includes(i));
+
+            // 在所有合法洞口中，找出「離目前球位置最近」的那一個
+            validIndices.forEach(idx => {
+                const cx = slots[idx].cx;
+                const dist = Math.abs(ball.x - cx);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    bestTargetX = cx;
+                    targetSlotIndex = idx; // 更新最終落點
+                }
+            });
+
+            // 施加微弱導引力，推向那個最近的合法洞口
+            if (bestTargetX !== -1) {
+                const distToTarget = bestTargetX - ball.x;
+                // 越接近底部，導引力稍微強一點點，確保進去
+                const strength = 0.005 + (ball.y / height) * 0.02; 
+                ball.vx += distToTarget * strength;
+            }
         }
 
         ball.x = nextX;
         ball.y = nextY;
 
-        // 4. 進洞判定
         if (ball.y > height - BALL_RADIUS) {
             ball.active = false;
-            ball.x = slots[targetSlotIndex].cx;
+            // 視覺修正：確保落在洞中央
+            if(targetSlotIndex !== -1) {
+                ball.x = slots[targetSlotIndex].cx;
+            }
             ball.y = height - 25;
             setTimeout(showResult, 200);
         }
     }
 
-    // --- Web3 與 邏輯 ---
     let provider, signer, contract, userAddress;
     let currentConfig = null;
     let pendingResult = null;
@@ -486,16 +472,9 @@
 
     function startBallDrop(multiplier, payout) {
         pendingResult = { payout, win: multiplier > 0 };
-        
-        if (multiplier > 0) {
-            targetSlotIndex = activeSlotIndices[Math.floor(Math.random() * activeSlotIndices.length)];
-        } else {
-            let all = Array.from({length: NUM_SLOTS}, (_, i) => i);
-            let empty = all.filter(i => !activeSlotIndices.includes(i));
-            targetSlotIndex = empty[Math.floor(Math.random() * empty.length)];
-        }
+        mustWin = multiplier > 0; // 設定 V10 導航目標類型
 
-        // 發射：增加隨機性，避免每次都一樣
+        // 初始完全隨機
         ball.x = width / 2 + (Math.random()-0.5) * 60; 
         ball.y = 20;
         ball.vx = (Math.random() - 0.5) * 3; 
@@ -545,3 +524,4 @@
 
 </body>
 </html>
+
