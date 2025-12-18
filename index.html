@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>夜市彈珠台 V3 (亮燈版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body {
+            background-color: #0d0d1a;
+            color: white;
+            font-family: 'Microsoft JhengHei', sans-serif;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #00f7ff;
+            text-shadow: 0 0 10px #00f7ff, 0 0 20px #00f7ff;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .container {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 25px;
+            border: 3px solid #00f7ff;
+            box-shadow: 0 0 40px rgba(0, 247, 255, 0.3);
+            max-width: 450px;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pool-display { color: #facc15; font-weight: bold; margin-bottom: 20px; font-size: 1.2em; text-shadow: 0 0 5px #facc15;}
+
+        /* 當前配置顯示 */
+        .config-display {
+            background: #000;
+            border: 2px solid #555;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+        .config-item { text-align: center; }
+        .config-label { font-size: 0.8em; color: #888; }
+        .config-val { font-size: 2em; font-weight: 800; color: #fff; }
+        #current-multi { color: #ff00de; text-shadow: 0 0 10px #ff00de; }
+
+        /* 彈珠台 15孔佈局 */
+        .pinball-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin: 25px 0;
+            perspective: 500px;
+        }
+
+        .slot {
+            background: #222;
+            border-radius: 50%;
+            width: 55px;
+            height: 55px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 3px solid #444;
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #666;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            transition: 0.3s;
+        }
+
+        /* 亮燈狀態 */
+        .slot.lit {
+            border-color: #00f7ff;
+            background: radial-gradient(circle, rgba(0,247,255,0.4) 0%, rgba(0,0,0,0) 70%);
+            color: white;
+            box-shadow: 0 0 15px #00f7ff, inset 0 0 10px #00f7ff;
+            transform: translateZ(10px);
+        }
+        
+        /* 刁鑽位置 (8倍用) - 視覺上更邊緣 */
+        .slot.hard-pos.lit {
+             border-color: #ff7700;
+             box-shadow: 0 0 15px #ff7700, inset 0 0 10px #ff7700;
+             background: radial-gradient(circle, rgba(255,119,0,0.4) 0%, rgba(0,0,0,0) 70%);
+        }
+
+        /* 落球狀態 */
+        .slot.landed {
+            background: #ff00de !important;
+            border-color: #ff00de !important;
+            box-shadow: 0 0 30px #ff00de !important;
+            color: white !important;
+            animation: pulse 0.5s infinite alternate;
+        }
+        @keyframes pulse { from {transform: scale(1);} to {transform: scale(1.1);} }
+
+        .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px;}
+        
+        .input-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #333;
+            padding: 10px;
+            border-radius: 12px;
+        }
+        
+        input {
+            background: transparent; border: none; color: white;
+            font-size: 1.4rem; text-align: center; width: 80px; font-weight: bold;
+        }
+        input:focus { outline: none; }
+
+        button {
+            width: 100%; padding: 15px; font-size: 1.1rem; font-weight: bold;
+            border: none; border-radius: 12px; cursor: pointer;
+            text-transform: uppercase; transition: 0.2s;
+        }
+        button:active { transform: scale(0.98); }
+        button:disabled { filter: grayscale(1); cursor: not-allowed; opacity: 0.7;}
+
+        #connectBtn { background: #2563eb; color: white; }
+        #randomBtn { background: #e11d48; color: white; box-shadow: 0 4px 15px rgba(225, 29, 72, 0.4); }
+        #playBtn { background: linear-gradient(90deg, #00f7ff, #ff00de); color: black; font-weight: 800; box-shadow: 0 0 20px rgba(0, 247, 255, 0.3); }
+
+        /* 彈窗 */
+        .modal {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal-content {
+            background: #1a1a2e; padding: 40px; border-radius: 20px; text-align: center;
+            border: 3px solid #00f7ff; box-shadow: 0 0 50px rgba(0, 247, 255, 0.4);
+            max-width: 350px; width: 90%; animation: popIn 0.3s;
+        }
+        @keyframes popIn { from {transform: scale(0.5);} to {transform: scale(1);} }
+        
+        .win-amount { font-size: 2.5em; color: #4ade80; font-weight: bold; margin: 10px 0; text-shadow: 0 0 10px #4ade80;}
+        .lose-text { font-size: 1.8em; color: #9ca3af; font-weight: bold; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<h1>夜市彈珠台 <span style="font-size:0.5em; vertical-align: middle;">V3</span></h1>
+<div class="pool-display">🏆 累積獎池: <span id="poolAmount">--</span> CRO</div>
+
+<div class="container">
+    
+    <div class="config-display">
+        <div class="config-item">
+            <div class="config-label">當前倍率</div>
+            <div class="config-val" id="current-multi">--</div>
+        </div>
+        <div class="config-item">
+            <div class="config-label">亮燈數</div>
+            <div class="config-val" id="current-lights">--</div>
+        </div>
+    </div>
+
+    <div class="pinball-grid" id="grid-container">
+        </div>
+
+    <button id="connectBtn" onclick="connectWallet()">連接錢包</button>
+    <div id="walletAddr" style="font-size:0.8em; color:#888; margin-bottom:10px; display:none;"></div>
+
+    <div class="controls">
+        <button id="randomBtn" onclick="randomizeSetup()" disabled>🎲 隨機切換配置 (免瓦斯費)</button>
+        
+        <div class="input-group">
+            <span style="color:#ccc; margin-right:10px;">下注:</span>
+            <input type="number" id="betAmount" value="1" placeholder="1">
+            <span style="color:#00f7ff; margin-left:10px; font-weight:bold;">CRO</span>
+        </div>
+
+        <button id="playBtn" onclick="playGame()" disabled>🚀 發射彈珠! (PLAY)</button>
+    </div>
+</div>
+
+<div class="modal" id="resultModal">
+    <div class="modal-content">
+        <h2 id="resultTitle">中獎啦！</h2>
+        <div id="resultValue" class="win-amount">+10 CRO</div>
+        <div id="resultDesc" style="color:#ccc; margin-bottom:20px;">打中亮燈洞口！</div>
+        <button onclick="closeModal()" style="background:#333; color:white; padding:12px; border-radius:10px; width:100%; cursor:pointer;">再來一局</button>
+    </div>
+</div>
+
+<script>
+    // =========================================
+    // 🔥 已自動填入 V3 合約地址
+    const CONTRACT_ADDRESS = "0xF7A250Da8B321ce557d0fF415BA93894650A5E12"; 
+    // =========================================
+
+    // V3 ABI: play 函數現在多了一個參數
+    const ABI = [
+        "function play(uint256 chosenMultiplier) external payable",
+        "function getBankrollBalance() external view returns (uint256)",
+        "event BallShot(address indexed player, uint256 betAmount, uint256 multiplier, uint256 payout)"
+    ];
+
+    let provider, signer, contract;
+    let currentMultiplier = 0; // 當前選擇的倍率
+    let activeSlotsIndices = []; // 當前亮燈的洞口索引
+
+    const totalSlots = 15;
+    // 定義邊緣/刁鑽位置的索引 (用於8倍視覺效果)
+    const hardIndices = [0, 4, 5, 9, 10, 14]; 
+
+    // 配置設定
+    const configs = [
+        { multi: 2, lights: 4 },
+        { multi: 4, lights: 3 },
+        { multi: 6, lights: 2 },
+        { multi: 8, lights: 2, hard: true }, // 8倍特殊標記
+        { multi: 10, lights: 1 }
+    ];
+
+    // 初始化網格
+    function initGrid() {
+        const container = document.getElementById("grid-container");
+        for(let i=0; i<totalSlots; i++) {
+            const slot = document.createElement("div");
+            slot.className = "slot";
+            slot.id = "slot-" + i;
+            slot.innerText = i + 1;
+            if(hardIndices.includes(i)) slot.classList.add("hard-pos");
+            container.appendChild(slot);
+        }
+    }
+    initGrid();
+
+    async function connectWallet() {
+        if (!window.ethereum) return alert("請安裝 MetaMask!");
+        try {
+            provider = new ethers.BrowserProvider(window.ethereum);
+            signer = await provider.getSigner();
+            const addr = await signer.getAddress();
+            
+            document.getElementById("connectBtn").style.display = "none";
+            document.getElementById("walletAddr").style.display = "block";
+            document.getElementById("walletAddr").innerText = "已連接: " + addr.substring(0,6) + "...";
+            
+            // 啟用按鈕
+            document.getElementById("randomBtn").disabled = false;
+            document.getElementById("playBtn").disabled = false;
+
+            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+            updatePool();
+            randomizeSetup(); // 連接後先隨機一次
+            
+            contract.on("BallShot", (player, bet, multiplier, payout) => {
+                if(player === addr) {
+                    runResultAnimation(Number(multiplier), ethers.formatEther(payout));
+                }
+            });
+
+        } catch (e) { alert("連接失敗: " + e.message); }
+    }
+
+    async function updatePool() {
+        if(!contract) return;
+        try {
+            const bal = await contract.getBankrollBalance();
+            document.getElementById("poolAmount").innerText = parseFloat(ethers.formatEther(bal)).toFixed(2);
+        } catch(e) {}
+    }
+
+    // --- 核心功能 1: 前端隨機配置 (不需瓦斯費) ---
+    function randomizeSetup() {
+        // 1. 清除舊狀態
+        document.querySelectorAll(".slot").forEach(el => el.classList.remove("lit"));
+        
+        // 2. 隨機選一個配置
+        const config = configs[Math.floor(Math.random() * configs.length)];
+        currentMultiplier = config.multi;
+        
+        // 更新 UI
+        document.getElementById("current-multi").innerText = config.multi + "X";
+        document.getElementById("current-lights").innerText = config.lights;
+
+        // 3. 隨機選出要亮燈的洞
+        let availableIndices = Array.from({length: totalSlots}, (_, i) => i);
+        
+        // 如果是 8 倍，優先從刁鑽位置選
+        if(config.hard) {
+             availableIndices = availableIndices.filter(i => hardIndices.includes(i));
+        }
+
+        // 洗牌並選取前 N 個
+        activeSlotsIndices = availableIndices.sort(() => 0.5 - Math.random()).slice(0, config.lights);
+        
+        // 4. 點亮它們
+        activeSlotsIndices.forEach(idx => {
+            document.getElementById("slot-" + idx).classList.add("lit");
+        });
+        
+        // 動畫效果：讓按鈕閃一下
+        const btn = document.getElementById("randomBtn");
+        btn.style.transform = "scale(0.95)";
+        setTimeout(()=> btn.style.transform = "scale(1)", 100);
+    }
+
+    // --- 核心功能 2: 上鏈遊玩 ---
+    async function playGame() {
+        if(currentMultiplier === 0) return alert("請先隨機選擇配置");
+        const amt = document.getElementById("betAmount").value;
+        if(amt <= 0) return;
+
+        try {
+            // 🔥 把當前選擇的倍率傳給合約
+            const tx = await contract.play(currentMultiplier, { value: ethers.parseEther(amt) });
+            
+            document.getElementById("playBtn").disabled = true;
+            document.getElementById("randomBtn").disabled = true;
+            document.getElementById("playBtn").innerText = "彈珠滾動中...";
+            
+            await tx.wait(); 
+        } catch (e) {
+            alert("交易失敗: " + e.message);
+            resetButtons();
+        }
+    }
+
+    // --- 動畫邏輯 ---
+    async function runResultAnimation(wonMultiplier, payout) {
+        const didWin = wonMultiplier > 0;
+        let finalSlotIndex;
+
+        if (didWin) {
+            // 贏了：隨機選一個「有亮燈」的洞作為落點
+            finalSlotIndex = activeSlotsIndices[Math.floor(Math.random() * activeSlotsIndices.length)];
+        } else {
+            // 輸了：找出所有「沒亮燈」的洞
+            const allIndices = Array.from({length: totalSlots}, (_, i) => i);
+            const inactiveIndices = allIndices.filter(i => !activeSlotsIndices.includes(i));
+            // 隨機選一個「沒亮燈」的洞
+            finalSlotIndex = inactiveIndices[Math.floor(Math.random() * inactiveIndices.length)];
+        }
+
+        // 簡單的跑燈動畫
+        let rounds = 0;
+        let currentHighlight = 0;
+        const spinInterval = setInterval(() => {
+            document.querySelectorAll(".slot").forEach(el => el.classList.remove("landed"));
+            document.getElementById("slot-" + (currentHighlight % totalSlots)).classList.add("landed");
+            currentHighlight++;
+            rounds++;
+
+            if(rounds > 20) { // 跑個幾圈後停在最終結果
+                clearInterval(spinInterval);
+                document.querySelectorAll(".slot").forEach(el => el.classList.remove("landed"));
+                const finalEl = document.getElementById("slot-" + finalSlotIndex);
+                finalEl.classList.add("landed");
+                
+                setTimeout(() => {
+                    showResultModal(didWin, wonMultiplier, payout);
+                    resetButtons();
+                    updatePool();
+                }, 800);
+            }
+        }, 100);
+    }
+
+    function showResultModal(didWin, multi, payout) {
+        const modal = document.getElementById("resultModal");
+        const title = document.getElementById("resultTitle");
+        const val = document.getElementById("resultValue");
+        const desc = document.getElementById("resultDesc");
+
+        modal.style.display = "flex";
+        
+        if (didWin) {
+            title.innerText = "🎉 恭喜中獎！";
+            title.style.color = "#4ade80";
+            val.innerText = `+${payout} CRO`;
+            val.style.color = "#4ade80";
+            desc.innerText = `成功打入亮燈洞口，獲得 ${multi} 倍獎勵！`;
+        } else {
+            title.innerText = "😢 沒中...";
+            title.style.color = "#9ca3af";
+            val.innerText = "再接再厲";
+            val.style.color = "#9ca3af";
+            desc.innerText = `彈珠落入未亮燈區域。`;
+        }
+    }
+
+    function closeModal() {
+        document.getElementById("resultModal").style.display = "none";
+        document.querySelectorAll(".slot").forEach(el => el.classList.remove("landed"));
+    }
+
+    function resetButtons() {
+        document.getElementById("playBtn").disabled = false;
+        document.getElementById("randomBtn").disabled = false;
+        document.getElementById("playBtn").innerText = "🚀 發射彈珠! (PLAY)";
+    }
+</script>
+
+</body>
+</html>
