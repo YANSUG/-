@@ -3,110 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夜市彈珠台 V11 (風控完善版)</title>
+    <title>Cronos 夜市彈珠台 (主網正式版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        :root {
-            --bg-dark: #0f0f13;
-            --neon-blue: #00f2ff;
-            --neon-pink: #ff0055;
-            --neon-green: #00ff99;
-            --wood-dark: #1a150e;
-        }
-
-        body {
-            background-color: var(--bg-dark);
-            color: white;
-            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
-            display: flex; flex-direction: column; align-items: center;
-            margin: 0; padding: 15px; min-height: 100vh;
-        }
-
-        .top-bar {
-            width: 100%; max-width: 450px;
-            display: flex; justify-content: flex-end; gap: 10px;
-            margin-bottom: 10px;
-        }
-        .nav-btn {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            color: white; padding: 5px 12px; border-radius: 15px; cursor: pointer;
-            font-size: 0.8em; transition: 0.2s;
-        }
-
-        h1 {
-            color: var(--neon-pink);
-            text-shadow: 0 0 10px var(--neon-pink);
-            margin: 0 0 10px 0; font-style: italic; letter-spacing: 1px;
-        }
-
-        .machine {
-            background: #2a2a35; padding: 15px; border-radius: 20px;
-            border: 4px solid #444; box-shadow: 0 0 40px rgba(0,0,0,0.6);
-            max-width: 450px; width: 100%;
-            display: flex; flex-direction: column; align-items: center;
-        }
-
-        /* 儀表板更新：三欄式 */
-        .dashboard {
-            width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;
-            background: #111; padding: 8px 10px; border-radius: 10px;
-            margin-bottom: 10px; box-sizing: border-box; border: 1px solid #333;
-        }
+        :root { --bg-dark: #0f0f13; --neon-blue: #00f2ff; --neon-pink: #ff0055; --neon-green: #00ff99; --wood-dark: #1a150e; }
+        body { background-color: var(--bg-dark); color: white; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 15px; min-height: 100vh; }
+        .top-bar { width: 100%; max-width: 450px; display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px; }
+        .nav-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 5px 12px; border-radius: 15px; cursor: pointer; font-size: 0.8em; transition: 0.2s; }
+        h1 { color: var(--neon-pink); text-shadow: 0 0 10px var(--neon-pink); margin: 0 0 10px 0; font-style: italic; letter-spacing: 1px; }
+        .machine { background: #2a2a35; padding: 15px; border-radius: 20px; border: 4px solid #444; box-shadow: 0 0 40px rgba(0,0,0,0.6); max-width: 450px; width: 100%; display: flex; flex-direction: column; align-items: center; }
+        .dashboard { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; background: #111; padding: 8px 10px; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #333; }
         .dash-item { display: flex; flex-direction: column; align-items: center; }
         .dash-label { font-size: 0.75em; color: #888; margin-bottom: 2px; }
         .dash-val { font-size: 1.1em; font-weight: bold; color: var(--neon-blue); font-family: monospace; }
-        
-        canvas {
-            background: var(--wood-dark);
-            border-radius: 12px; border: 2px solid #5c3a1b;
-            box-shadow: inset 0 0 60px rgba(0,0,0,0.9);
-            margin-bottom: 15px; cursor: pointer;
-            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 10px);
-        }
-
+        canvas { background: var(--wood-dark); border-radius: 12px; border: 2px solid #5c3a1b; box-shadow: inset 0 0 60px rgba(0,0,0,0.9); margin-bottom: 15px; cursor: pointer; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 10px); }
         .controls { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-
-        .btn {
-            padding: 12px; border: none; border-radius: 10px;
-            font-weight: bold; font-size: 1rem; cursor: pointer;
-            text-transform: uppercase; transition: 0.2s;
-        }
+        .btn { padding: 12px; border: none; border-radius: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
         .btn:active { transform: scale(0.98); }
-
         .btn-connect { background: #3b82f6; color: white; }
         .btn-random { background: linear-gradient(135deg, #e11d48, #be123c); color: white; }
         .btn-play { background: linear-gradient(135deg, #00f260, #0575e6); color: white; box-shadow: 0 4px 10px rgba(5, 117, 230, 0.3); }
-
-        .input-wrapper {
-            display: flex; justify-content: space-between; align-items: center;
-            background: #111; padding: 8px 15px; border-radius: 10px; border: 1px solid #333;
-            transition: 0.3s;
-        }
-        /* 超出限額時變紅 */
+        .input-wrapper { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 8px 15px; border-radius: 10px; border: 1px solid #333; transition: 0.3s; }
         .input-wrapper.error { border-color: #ff0055; box-shadow: 0 0 10px rgba(255, 0, 85, 0.3); }
-        
-        .bet-input {
-            background: transparent; border: none; color: white; font-size: 1.2rem;
-            text-align: right; width: 80px; font-weight: bold;
-        }
+        .bet-input { background: transparent; border: none; color: white; font-size: 1.2rem; text-align: right; width: 80px; font-weight: bold; }
         .bet-input:focus { outline: none; }
-
         .wallet-info { font-size: 0.8em; color: #888; margin-top: 5px; display: flex; justify-content: space-between; width: 100%; }
-
-        .modal-overlay {
-            position: fixed; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
-            display: none; justify-content: center; align-items: center; z-index: 1000;
-        }
-        .modal-content {
-            background: #1e1e24; padding: 30px; border-radius: 15px;
-            text-align: center; border: 1px solid #444; width: 80%; max-width: 300px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-            animation: popIn 0.3s;
-        }
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #1e1e24; padding: 30px; border-radius: 15px; text-align: center; border: 1px solid #444; width: 80%; max-width: 300px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); animation: popIn 0.3s; }
         @keyframes popIn { from{transform: scale(0.8); opacity:0;} to{transform: scale(1); opacity:1;} }
-        
         .rule-row { text-align: left; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 0.9em; }
     </style>
 </head>
@@ -138,16 +63,13 @@
     <canvas id="gameCanvas" width="400" height="620"></canvas>
 
     <div class="controls">
-        <button class="btn btn-connect" id="connectBtn" onclick="connectWallet()"><span data-i18n="connect">連接錢包</span></button>
-        
+        <button class="btn btn-connect" id="connectBtn" onclick="connectWallet()"><span data-i18n="connect">連接錢包 (Cronos)</span></button>
         <div id="gameUI" style="display:none; width:100%; flex-direction:column; gap:8px;">
             <div class="wallet-info">
                 <span id="walletAddr">--</span>
                 <span><span data-i18n="balance">餘額</span>: <span id="userBalance" style="color:#00f2ff">--</span> CRO</span>
             </div>
-
             <button class="btn btn-random" id="randomBtn" onclick="randomizeConfig()"><span data-i18n="random_btn">🎰 投幣選台</span></button>
-            
             <div class="input-wrapper" id="betWrapper">
                 <span style="color:#aaa; font-size:0.9em;" data-i18n="bet">下注</span>
                 <div>
@@ -155,7 +77,6 @@
                     <span style="color:#00f2ff; font-weight:bold;">CRO</span>
                 </div>
             </div>
-
             <button class="btn btn-play" id="playBtn" onclick="playGame()" disabled><span data-i18n="play_btn">🔴 拉桿發射</span></button>
         </div>
     </div>
@@ -178,7 +99,9 @@
 </div>
 
 <script>
-    const CONTRACT_ADDRESS = "0xF7A250Da8B321ce557d0fF415BA93894650A5E12";
+    // 🔥 主網彈珠台合約地址
+    const CONTRACT_ADDRESS = "0xbE9A101a6426645d2bF0Ad7BF0cba5073315E945";
+    
     const ABI = [
         "function play(uint256 chosenMultiplier) external payable",
         "function getBankrollBalance() external view returns (uint256)",
@@ -187,324 +110,150 @@
 
     const i18n = {
         zh: {
-            title: "夜市彈珠台", rules: "規則", connect: "連接錢包", multiplier: "倍率", pool: "獎池", max_bet: "最大下注",
+            title: "夜市彈珠台", rules: "規則", connect: "連接錢包 (Cronos)", multiplier: "倍率", pool: "獎池", max_bet: "最大下注",
             balance: "餘額", random_btn: "🎰 投幣選台 (隨機配置)", bet: "下注", play_btn: "🔴 拉桿發射",
             rules_title: "📜 遊戲規則", close: "關閉", confirm: "確定",
             win: "🎉 中獎啦！", lose: "😢 沒中...", waiting: "確認中...", rolling: "彈珠滾動中...",
-            rule_html: `
-                <div class="rule-row">1. 點擊「投幣選台」隨機切換倍率。</div>
-                <div class="rule-row">2. 倍率越高，最大可下注金額越低。</div>
-                <div class="rule-row">3. 彈珠落入「亮燈」洞口即中獎。</div>
-            `
+            rule_html: `<div class="rule-row">1. 點擊「投幣選台」隨機切換倍率。</div><div class="rule-row">2. 倍率越高，最大可下注金額越低。</div><div class="rule-row">3. 彈珠落入「亮燈」洞口即中獎。</div>`
         },
         en: {
-            title: "Pinball", rules: "Rules", connect: "Connect", multiplier: "Multi", pool: "Pool", max_bet: "Max Bet",
+            title: "Pinball", rules: "Rules", connect: "Connect (Cronos)", multiplier: "Multi", pool: "Pool", max_bet: "Max Bet",
             balance: "Bal", random_btn: "🎰 Random Setup", bet: "Bet", play_btn: "🔴 Launch",
             rules_title: "📜 Rules", close: "Close", confirm: "OK",
             win: "🎉 YOU WIN!", lose: "😢 MISSED...", waiting: "Confirming...", rolling: "Rolling...",
-            rule_html: `
-                <div class="rule-row">1. Click 'Random Setup' to start.</div>
-                <div class="rule-row">2. Higher multiplier = Lower Max Bet.</div>
-                <div class="rule-row">3. Land in a LIT slot to win.</div>
-            `
+            rule_html: `<div class="rule-row">1. Click 'Random Setup' to start.</div><div class="rule-row">2. Higher multiplier = Lower Max Bet.</div><div class="rule-row">3. Land in a LIT slot to win.</div>`
         }
     };
     let curLang = 'zh';
 
-    const CONFIGS = [
-        { multi: 2, lights: 4 },
-        { multi: 4, lights: 3 },
-        { multi: 6, lights: 2 },
-        { multi: 8, lights: 2 },
-        { multi: 10, lights: 1 }
-    ];
+    const CONFIGS = [ { multi: 2, lights: 4 }, { multi: 4, lights: 3 }, { multi: 6, lights: 2 }, { multi: 8, lights: 2 }, { multi: 10, lights: 1 } ];
     const NUM_SLOTS = 10;
-    
-    // 物理引擎
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
-
-    const GRAVITY = 0.12;       
-    const BOUNCE = 0.5;         
-    const FRICTION = 0.99;      
-    const PIN_RADIUS = 3;
-    const BALL_RADIUS = 6;
-
+    const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
+    const width = canvas.width; const height = canvas.height;
+    const GRAVITY = 0.12; const BOUNCE = 0.5; const FRICTION = 0.99; const PIN_RADIUS = 3; const BALL_RADIUS = 6;
     let ball = { x: 0, y: 0, vx: 0, vy: 0, active: false };
-    let pins = [];
-    let slots = [];
-    let activeSlotIndices = [];
-    let targetSlotIndex = -1;
-    let pinHitIndex = -1; 
-    let mustWin = false;
+    let pins = []; let slots = []; let activeSlotIndices = []; let targetSlotIndex = -1; let pinHitIndex = -1; let mustWin = false;
 
     function initPhysics() {
-        pins = [];
-        const rows = 13; 
-        const startY = 80;
-        const spacingY = 35;
-
+        pins = []; const rows = 13; const startY = 80; const spacingY = 35;
         for (let r = 0; r < rows; r++) {
-            const isEven = r % 2 === 0;
-            const cols = isEven ? 9 : 10;
-            const rowWidth = (cols - 1) * 38;
-            const offsetX = (width - rowWidth) / 2;
-
-            for (let c = 0; c < cols; c++) {
-                const jitterX = (Math.random() - 0.5) * 8; 
-                const jitterY = (Math.random() - 0.5) * 8;
-                pins.push({
-                    x: offsetX + c * 38 + jitterX,
-                    y: startY + r * spacingY + jitterY
-                });
-            }
+            const isEven = r % 2 === 0; const cols = isEven ? 9 : 10; const rowWidth = (cols - 1) * 38; const offsetX = (width - rowWidth) / 2;
+            for (let c = 0; c < cols; c++) { const jitterX = (Math.random() - 0.5) * 8; const jitterY = (Math.random() - 0.5) * 8; pins.push({ x: offsetX + c * 38 + jitterX, y: startY + r * spacingY + jitterY }); }
         }
-        const slotWidth = width / NUM_SLOTS;
-        slots = [];
-        for(let i=0; i<NUM_SLOTS; i++) {
-            slots.push({
-                x: i * slotWidth,
-                w: slotWidth,
-                cx: i * slotWidth + slotWidth / 2,
-            });
-        }
+        const slotWidth = width / NUM_SLOTS; slots = [];
+        for(let i=0; i<NUM_SLOTS; i++) { slots.push({ x: i * slotWidth, w: slotWidth, cx: i * slotWidth + slotWidth / 2, }); }
     }
 
     function draw() {
-        ctx.fillStyle = '#1a150e';
-        ctx.fillRect(0, 0, width, height);
-        pins.forEach((p, i) => {
-            ctx.beginPath(); ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
-            if (i === pinHitIndex) { ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#fff'; } 
-            else { ctx.fillStyle = '#999'; ctx.shadowBlur = 0; }
-            ctx.fill();
-        });
-        ctx.shadowBlur = 0; if(pinHitIndex !== -1) pinHitIndex = -1;
-
+        ctx.fillStyle = '#1a150e'; ctx.fillRect(0, 0, width, height);
+        pins.forEach((p, i) => { ctx.beginPath(); ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2); if (i === pinHitIndex) { ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#fff'; } else { ctx.fillStyle = '#999'; ctx.shadowBlur = 0; } ctx.fill(); }); ctx.shadowBlur = 0; if(pinHitIndex !== -1) pinHitIndex = -1;
         for(let i=0; i<NUM_SLOTS; i++) {
-            const s = slots[i];
-            const isLit = activeSlotIndices.includes(i);
+            const s = slots[i]; const isLit = activeSlotIndices.includes(i);
             ctx.fillStyle = '#111'; ctx.fillRect(s.x+1, height-40, s.w-2, 40);
-            if(isLit) {
-                ctx.fillStyle = '#00f2ff'; ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
-                ctx.beginPath(); ctx.arc(s.cx, height-25, 5, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
-            } else {
-                ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(s.cx, height-25, 3, 0, Math.PI*2); ctx.fill();
-            }
+            if(isLit) { ctx.fillStyle = '#00f2ff'; ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff'; ctx.beginPath(); ctx.arc(s.cx, height-25, 5, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; } 
+            else { ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(s.cx, height-25, 3, 0, Math.PI*2); ctx.fill(); }
             ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.moveTo(s.x, height-40); ctx.lineTo(s.x, height); ctx.stroke();
         }
-
-        if (ball.active) {
-            updatePhysics();
-            ctx.fillStyle = '#ff0055'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055';
-            ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x-2, ball.y-2, 2, 0, Math.PI*2); ctx.fill();
-        }
+        if (ball.active) { updatePhysics(); ctx.fillStyle = '#ff0055'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055'; ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x-2, ball.y-2, 2, 0, Math.PI*2); ctx.fill(); }
         requestAnimationFrame(draw);
     }
 
     function updatePhysics() {
         ball.vy += GRAVITY; ball.vx *= FRICTION; ball.vy *= FRICTION;
         let nextX = ball.x + ball.vx; let nextY = ball.y + ball.vy;
-
-        if (nextX < BALL_RADIUS) { nextX = BALL_RADIUS; ball.vx *= -0.7; }
-        if (nextX > width - BALL_RADIUS) { nextX = width - BALL_RADIUS; ball.vx *= -0.7; }
-
+        if (nextX < BALL_RADIUS) { nextX = BALL_RADIUS; ball.vx *= -0.7; } if (nextX > width - BALL_RADIUS) { nextX = width - BALL_RADIUS; ball.vx *= -0.7; }
         for (let i=0; i<pins.length; i++) {
-            const p = pins[i]; const dx = nextX - p.x; const dy = nextY - p.y;
-            const distSq = dx*dx + dy*dy; const minDist = BALL_RADIUS + PIN_RADIUS;
+            const p = pins[i]; const dx = nextX - p.x; const dy = nextY - p.y; const distSq = dx*dx + dy*dy; const minDist = BALL_RADIUS + PIN_RADIUS;
             if (distSq < minDist * minDist) {
-                pinHitIndex = i;
-                const angle = Math.atan2(dy, dx);
-                nextX = p.x + Math.cos(angle) * (minDist + 1.0);
-                nextY = p.y + Math.sin(angle) * (minDist + 1.0);
-                const noise = (Math.random() - 0.5) * 1.5; 
-                ball.vx += Math.cos(angle) * 1.5 + noise;
-                ball.vy = Math.abs(ball.vy) * -BOUNCE; 
+                pinHitIndex = i; const angle = Math.atan2(dy, dx);
+                nextX = p.x + Math.cos(angle) * (minDist + 1.0); nextY = p.y + Math.sin(angle) * (minDist + 1.0);
+                const noise = (Math.random() - 0.5) * 1.5; ball.vx += Math.cos(angle) * 1.5 + noise; ball.vy = Math.abs(ball.vy) * -BOUNCE; 
                 if(Math.abs(ball.vx) < 0.3) ball.vx += (Math.random() > 0.5 ? 0.8 : -0.8);
             }
         }
-
         if (ball.y > 450 && ball.y < height - 50) {
             let bestTargetX = -1; let minDistance = 9999;
-            const validIndices = mustWin ? activeSlotIndices : 
-                Array.from({length: NUM_SLOTS}, (_, i) => i).filter(i => !activeSlotIndices.includes(i));
-            validIndices.forEach(idx => {
-                const cx = slots[idx].cx; const dist = Math.abs(ball.x - cx);
-                if (dist < minDistance) { minDistance = dist; bestTargetX = cx; targetSlotIndex = idx; }
-            });
-            if (bestTargetX !== -1) {
-                const distToTarget = bestTargetX - ball.x;
-                const strength = 0.005 + (ball.y / height) * 0.02; 
-                ball.vx += distToTarget * strength;
-            }
+            const validIndices = mustWin ? activeSlotIndices : Array.from({length: NUM_SLOTS}, (_, i) => i).filter(i => !activeSlotIndices.includes(i));
+            validIndices.forEach(idx => { const cx = slots[idx].cx; const dist = Math.abs(ball.x - cx); if (dist < minDistance) { minDistance = dist; bestTargetX = cx; targetSlotIndex = idx; } });
+            if (bestTargetX !== -1) { const distToTarget = bestTargetX - ball.x; const strength = 0.005 + (ball.y / height) * 0.02; ball.vx += distToTarget * strength; }
         }
         ball.x = nextX; ball.y = nextY;
-        if (ball.y > height - BALL_RADIUS) {
-            ball.active = false;
-            if(targetSlotIndex !== -1) ball.x = slots[targetSlotIndex].cx;
-            ball.y = height - 25; setTimeout(showResult, 200);
-        }
+        if (ball.y > height - BALL_RADIUS) { ball.active = false; if(targetSlotIndex !== -1) ball.x = slots[targetSlotIndex].cx; ball.y = height - 25; setTimeout(showResult, 200); }
     }
 
-    let provider, signer, contract, userAddress;
-    let currentConfig = null;
-    let pendingResult = null;
-    let poolBalanceEth = 0; // 🔥 記錄獎池金額 (浮點數)
+    let provider, signer, contract, userAddress; let currentConfig = null; let pendingResult = null; let poolBalanceEth = 0;
 
     async function connectWallet() {
         if (!window.ethereum) return alert("Please install MetaMask");
         try {
-            provider = new ethers.BrowserProvider(window.ethereum);
-            signer = await provider.getSigner();
-            userAddress = await signer.getAddress();
-            document.getElementById("connectBtn").style.display = "none";
-            document.getElementById("gameUI").style.display = "flex";
-            document.getElementById("walletAddr").innerText = userAddress.substring(0,6) + "...";
-            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-            await updateData();
-            randomizeConfig();
-            initPhysics();
-            draw();
-            setInterval(updateData, 5000);
+            provider = new ethers.BrowserProvider(window.ethereum); signer = await provider.getSigner(); userAddress = await signer.getAddress();
+            const network = await provider.getNetwork();
+            if (network.chainId !== 25n) return alert("Please switch to Cronos Mainnet (Chain ID 25)");
+            document.getElementById("connectBtn").style.display = "none"; document.getElementById("gameUI").style.display = "flex"; document.getElementById("walletAddr").innerText = userAddress.substring(0,6) + "...";
+            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer); await updateData(); randomizeConfig(); initPhysics(); draw(); setInterval(updateData, 5000);
         } catch (e) { alert("Connect Failed"); }
     }
 
     async function updateData() {
         if(!contract || !userAddress) return;
         try {
-            const bal = await contract.getBankrollBalance();
-            poolBalanceEth = parseFloat(ethers.formatEther(bal)); // 存下來
+            const bal = await contract.getBankrollBalance(); poolBalanceEth = parseFloat(ethers.formatEther(bal)); 
             document.getElementById("poolAmount").innerText = poolBalanceEth.toFixed(2);
-            
-            const userBal = await provider.getBalance(userAddress);
-            document.getElementById("userBalance").innerText = parseFloat(ethers.formatEther(userBal)).toFixed(2);
-            
-            // 更新限額
+            const userBal = await provider.getBalance(userAddress); document.getElementById("userBalance").innerText = parseFloat(ethers.formatEther(userBal)).toFixed(2);
             validateBet();
         } catch(e){}
     }
 
     function randomizeConfig() {
-        const conf = CONFIGS[Math.floor(Math.random() * CONFIGS.length)];
-        currentConfig = conf;
+        const conf = CONFIGS[Math.floor(Math.random() * CONFIGS.length)]; currentConfig = conf;
         document.getElementById("disp-multi").innerText = conf.multi + "X";
-        let all = Array.from({length: NUM_SLOTS}, (_, i) => i);
-        activeSlotIndices = all.sort(() => 0.5 - Math.random()).slice(0, conf.lights);
-        validateBet(); // 重新計算限額
+        let all = Array.from({length: NUM_SLOTS}, (_, i) => i); activeSlotIndices = all.sort(() => 0.5 - Math.random()).slice(0, conf.lights);
+        validateBet();
     }
 
-    // 🔥 V11: 計算並顯示最大下注
     function validateBet() {
         if (!currentConfig) return;
-
-        // 公式：最大下注 = (池子/4) / 倍率
         let maxBet = (poolBalanceEth / 4) / currentConfig.multi;
-        
-        // 顯示在 UI
         document.getElementById("maxBetVal").innerText = maxBet.toFixed(2);
-
-        // 檢查輸入
-        const input = document.getElementById("betAmount");
-        const amt = parseFloat(input.value);
-        const btn = document.getElementById("playBtn");
-        const wrapper = document.getElementById("betWrapper");
-
-        if(amt > 0 && amt <= maxBet) {
-            btn.disabled = false;
-            wrapper.classList.remove("error");
-        } else {
-            btn.disabled = true;
-            wrapper.classList.add("error"); // 變紅
-        }
+        const input = document.getElementById("betAmount"); const amt = parseFloat(input.value); const btn = document.getElementById("playBtn"); const wrapper = document.getElementById("betWrapper");
+        if(amt > 0 && amt <= maxBet) { btn.disabled = false; wrapper.classList.remove("error"); } else { btn.disabled = true; wrapper.classList.add("error"); }
     }
 
     async function playGame() {
         if (!currentConfig) return;
-        const amt = document.getElementById("betAmount").value;
-        const playBtn = document.getElementById("playBtn");
-        
-        playBtn.disabled = true;
-        playBtn.innerHTML = getTrans("waiting");
-
+        const amt = document.getElementById("betAmount").value; const playBtn = document.getElementById("playBtn");
+        playBtn.disabled = true; playBtn.innerHTML = getTrans("waiting");
         try {
             const tx = await contract.play(currentConfig.multi, { value: ethers.parseEther(amt) });
             playBtn.innerHTML = getTrans("rolling");
-            
             const receipt = await tx.wait();
-            
-            let wonMultiplier = 0;
-            let payout = 0;
-            for (const log of receipt.logs) {
-                try {
-                    const parsed = contract.interface.parseLog(log);
-                    if (parsed.name === "BallShot" && parsed.args.player === userAddress) {
-                        wonMultiplier = Number(parsed.args.multiplier);
-                        payout = ethers.formatEther(parsed.args.payout);
-                    }
-                } catch(e){}
-            }
-            startBallDrop(wonMultiplier, payout);
-            updateData(); 
-
-        } catch (e) {
-            console.error(e);
-            alert("Transaction Cancelled");
-            resetUI();
-        }
+            let wonMultiplier = 0; let payout = 0;
+            for (const log of receipt.logs) { try { const parsed = contract.interface.parseLog(log); if (parsed.name === "BallShot" && parsed.args.player === userAddress) { wonMultiplier = Number(parsed.args.multiplier); payout = ethers.formatEther(parsed.args.payout); } } catch(e){} }
+            startBallDrop(wonMultiplier, payout); updateData(); 
+        } catch (e) { console.error(e); alert("Transaction Cancelled"); resetUI(); }
     }
 
     function startBallDrop(multiplier, payout) {
-        pendingResult = { payout, win: multiplier > 0 };
-        mustWin = multiplier > 0;
-        ball.x = width / 2 + (Math.random()-0.5) * 60; 
-        ball.y = 20;
-        ball.vx = (Math.random() - 0.5) * 3; 
-        ball.vy = 0;
-        ball.active = true;
+        pendingResult = { payout, win: multiplier > 0 }; mustWin = multiplier > 0;
+        ball.x = width / 2 + (Math.random()-0.5) * 60; ball.y = 20; ball.vx = (Math.random() - 0.5) * 3; ball.vy = 0; ball.active = true;
     }
 
     function showResult() {
-        const modal = document.getElementById("resultModal");
-        const title = document.getElementById("resTitle");
-        const val = document.getElementById("resVal");
-        
+        const modal = document.getElementById("resultModal"); const title = document.getElementById("resTitle"); const val = document.getElementById("resVal");
         modal.style.display = "flex";
-        if (pendingResult.win) {
-            title.innerText = getTrans("win");
-            title.style.color = "#00f2ff";
-            val.innerText = "+" + pendingResult.payout + " CRO";
-        } else {
-            title.innerText = getTrans("lose");
-            title.style.color = "#888";
-            val.innerText = "Try Again";
-        }
+        if (pendingResult.win) { title.innerText = getTrans("win"); title.style.color = "#00f2ff"; val.innerText = "+" + pendingResult.payout + " CRO"; } 
+        else { title.innerText = getTrans("lose"); title.style.color = "#888"; val.innerText = "Try Again"; }
         updateData();
     }
 
-    function resetUI() {
-        const btn = document.getElementById("playBtn");
-        btn.disabled = false;
-        btn.innerHTML = `<span data-i18n="play_btn">${getTrans("play_btn")}</span>`;
-    }
-
+    function resetUI() { const btn = document.getElementById("playBtn"); btn.disabled = false; btn.innerHTML = `<span data-i18n="play_btn">${getTrans("play_btn")}</span>`; }
     function openRules() { document.getElementById("rulesModal").style.display = "flex"; updateText(); }
     function closeModal(id) { document.getElementById(id).style.display = "none"; if(id === "resultModal") resetUI(); }
     function toggleLang() { curLang = curLang === 'zh' ? 'en' : 'zh'; updateText(); }
     function getTrans(key) { return i18n[curLang][key]; }
-    function updateText() {
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            el.innerText = i18n[curLang][el.getAttribute('data-i18n')];
-        });
-        document.getElementById("rulesContent").innerHTML = i18n[curLang]['rule_html'];
-    }
+    function updateText() { document.querySelectorAll('[data-i18n]').forEach(el => { el.innerText = i18n[curLang][el.getAttribute('data-i18n')]; }); document.getElementById("rulesContent").innerHTML = i18n[curLang]['rule_html']; }
 
-    updateText();
-    initPhysics();
-    draw(); 
+    updateText(); initPhysics(); draw(); 
 </script>
-
 </body>
 </html>
